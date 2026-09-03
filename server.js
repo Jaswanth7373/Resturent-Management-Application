@@ -17,14 +17,14 @@ const io = new Server(server, { cors: { origin: '*' } });
 app.use(cors());
 app.use(express.json());
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
 
 app.post('/api/assistant/chat', async (req, res) => {
   try {
     const { message, context, payload } = req.body || {};
     if (!message) return res.status(400).json({ error: 'Message is required' });
-    if (!GEMINI_API_KEY) {
-      return res.status(503).json({ error: 'AI assistant is not configured. Set GEMINI_API_KEY in your environment.' });
+    if (!apiKey) {
+      return res.status(503).json({ error: 'AI assistant is not configured. Set GOOGLE_API_KEY or GEMINI_API_KEY in your environment.' });
     }
 
     const prompt = `You are The Copper Fork assistant embedded in the restaurant platform.
@@ -35,7 +35,7 @@ Live context: ${JSON.stringify(payload || {})}
 
 Answer the user's question directly, briefly, and helpfully. Keep it focused on the current page and its role. If there is live data, use it. If not, answer based on the page context.`;
 
-    const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
