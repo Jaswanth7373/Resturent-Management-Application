@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kitchen Display — The Copper Fork</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .kds-col h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--ink-soft); }
+  .kds-board { display:grid; grid-template-columns: repeat(4, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 1000px) { .kds-board { grid-template-columns: 1fr 1fr; } }
+  .urgent { border-left: 4px solid var(--rust); }
+</style>
+</head>
+<body>
+<div id="topbarRoot"></div>
+<div class="shell">
+  <div class="tabs" id="tabNav"></div>
+  <div id="view"></div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const user = Auth.requireRole(['chef']);
+document.getElementById('topbarRoot').innerHTML = renderTopbar('Chef');
+let state = { orders: [], menuItems: [], ingredients: [], activeTab: 'kds', socket: null };
+
+window.__getAssistantLiveData = async function() {
+  const pendingOrders = state.orders.filter(o => ['pending_acceptance', 'accepted', 'preparing'].includes(o.status)).length;
+  const lowStockItems = (state.ingredients || []).filter(i => i.stock <= i.lowStockThreshold).map(i => ({ name: i.name, qty: i.stock }));
+  return { kind: 'chef', pendingOrders, lowStockCount: lowStockItems.length, lowStockItems };
+};
+
+async function init() {
+  state.socket = connectSocket(user.branchId);
+  state.socket.on('order:new', (o) => { toast(`New order ${o.orderNumber}`); refresh(); });
+  state.socket.on('order:updated', refresh);
+  state.socket.on('inventory:low_stock', (d) => toast(`⚠ Low stock: ${d.ingredient} (${d.stock} left)`));
+  state.socket.on('menu:updated', refresh);
+  state.socket.on('stock:updated', () => refresh());
+  mountAttendanceWidget(user.branchId);
+  await loadAll();
+  setTab('kds');
+}
+async function loadAll() {
+  const [orders, menu, ingredients] = await Promise.all([
+    Api.get('/orders/' + user.branchId),
+    Api.get('/menu/' + user.branchId),
+    Api.get('/inventory/' + user.branchId),
+  ]);
+  state.orders = orders; state.menuItems = menu.items; state.categories = menu.categories; state.ingredients = ingredients;
+}
+async function refresh() { await loadAll(); render(); }
+
+function setTab(tab) {
+  state.activeTab = tab;
+  const tabs = [ {id:'kds',label:'Kitchen Display'}, {id:'menu',label:'Menu & Submissions'}, {id:'inventory',label:'Inventory'}, {id:'history',label:'History'}, {id:'attendance',label:'My Attendance'} ];
+  document.getElementById('tabNav').innerHTML = tabs.map(t => `<button class="tab ${state.activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`).join('');
+  render();
+}
+function render() { ({kds:renderKds, menu:renderMenuAdmin, inventory:renderChefInventory, history:renderHistory, attendance:renderMyAttendance})[state.activeTab](); }
+
+async function renderMyAttendance() {
+  const data = await Api.get(`/attendance/${user.branchId}/me`);
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Your shifts</div>
+    ${data.open ? `<div class="card" style="background:var(--brass-soft);border:none;margin-bottom:14px">Currently on shift since ${new Date(data.open.clockIn).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>` : ''}
+    <div class="grid grid-3">
+      ${data.history.length === 0 ? '<p class="muted">No shifts recorded yet.</p>' : data.history.map(a => `
+        <div class="card">
+          <div class="flex-between"><strong>${a.date}</strong><span class="badge ${a.clockOut ? 'completed' : 'accepted'}">${a.clockOut ? 'Ended' : 'On shift'}</span></div>
+          <div class="muted">In: ${new Date(a.clockIn).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>
+          ${a.clockOut ? `<div class="muted">Out: ${new Date(a.clockOut).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · ${a.durationMinutes} min</div>` : ''}
+        </div>`).join('')}
+    </div>
+  `;
+}
+
+function renderKds() {
+  const cols = [
+    { key: 'pending_acceptance', label: 'New — needs accept' },
+    { key: 'accepted', label: 'Accepted' },
+    { key: 'preparing', label: 'Preparing' },
+    { key: 'ready', label: 'Ready' },
+  ];
+  const low = (state.ingredients || []).filter(i => i.stock <= i.lowStockThreshold);
+  document.getElementById('view').innerHTML = `
+    ${low.length ? `<div class="card" style="background:#F6DCD6;border:none;margin-bottom:14px">⚠ Low stock: ${low.map(i=>`${i.name} (${i.stock}${i.unit})`).join(', ')}</div>` : ''}
+    <div class="kds-board">
+    ${cols.map(c => `
+      <div class="kds-col">
+        <h3>${c.label} (${state.orders.filter(o=>o.status===c.key).length})</h3>
+        ${state.orders.filter(o=>o.status===c.key).sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt)).map(o => renderKdsTicket(o, c.key)).join('') || '<p class="muted">Nothing here.</p>'}
+      </div>`).join('')}
+  </div>`;
+}
+function renderKdsTicket(o, colKey) {
+  const mins = Math.floor((Date.now() - new Date(o.createdAt))/60000);
+  return `
+    <div class="ticket ${mins>10?'urgent':''}" style="margin-bottom:14px">
+      <div class="ticket-head"><span class="ticket-num">${o.orderNumber}</span><span class="muted">${mins}m ago</span></div>
+      <div class="ticket-body">
+        <div class="muted">${o.mode==='dine_in' ? 'Dine-in' : 'Take-away'} · ${o.customerName}</div>
+        ${o.items.map(i => `<div class="ticket-item"><span>${i.qty}× ${i.name}</span>${i.specialInstructions?`<em class="muted">${i.specialInstructions}</em>`:''}</div>`).join('')}
+      </div>
+      <div class="ticket-foot">
+        ${colKey==='pending_acceptance' ? `
+          <button class="btn btn-primary btn-sm" onclick="accept('${o.id}')">Accept</button>
+          <button class="btn btn-danger btn-sm" onclick="reject('${o.id}')">Out of stock</button>` : ''}
+        ${colKey==='accepted' ? `<button class="btn btn-brass btn-sm" onclick="setStatus('${o.id}','preparing')">Start preparing</button>` : ''}
+        ${colKey==='preparing' ? `<button class="btn btn-brass btn-sm" onclick="setStatus('${o.id}','ready')">Mark ready</button>` : ''}
+        ${colKey==='ready' ? `<span class="badge ready">Waiting for pickup / serve</span>` : ''}
+      </div>
+    </div>`;
+}
+async function accept(id) { await Api.patch(`/orders/${user.branchId}/${id}/accept`); toast('Order accepted — inventory deducted'); refresh(); }
+async function reject(id) { await Api.patch(`/orders/${user.branchId}/${id}/reject`, { reason: 'Item out of stock' }); toast('Order rejected'); refresh(); }
+async function setStatus(id, status) { await Api.patch(`/orders/${user.branchId}/${id}/status`, { status }); refresh(); }
+
+function renderMenuAdmin() {
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Propose a new menu item</div>
+    <div class="card" style="max-width:520px">
+      <div class="grid grid-2">
+        <div class="field"><label>Name</label><input id="mName"></div>
+        <div class="field"><label>Price (₹)</label><input type="number" id="mPrice"></div>
+        <div class="field"><label>Category</label><select id="mCat">${state.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div>
+        <div class="field"><label>Mode</label><select id="mMode"><option value="both">Dine-in & Take-away</option><option value="dine_in">Dine-in only</option><option value="take_away">Take-away only</option></select></div>
+        <div class="field"><label>Veg?</label><select id="mVeg"><option value="true">Veg</option><option value="false">Non-veg</option></select></div>
+        <div class="field"><label>Prep time (min)</label><input type="number" id="mPrep" value="15"></div>
+      </div>
+      <div class="field"><label>Description</label><textarea id="mDesc" rows="2"></textarea></div>
+      <button class="btn btn-primary" onclick="submitItem()">Send for Sub-Admin approval</button>
+    </div>
+
+    <div class="section-title">Menu Stock Management</div>
+    <div class="card">
+      <div class="grid grid-3">
+        ${state.menuItems.map(i => `
+          <div class="card" style="padding:14px">
+            <div class="flex-between"><strong>${i.name}</strong><span class="badge ${i.availabilityStatus === 'available' ? 'accepted' : i.availabilityStatus === 'low_stock' ? 'preparing' : 'rejected'}">${statusLabel(i.availabilityStatus || 'available')}</span></div>
+            <div class="muted" style="margin-top:6px">${i.categoryId ? state.categories.find(c=>c.id===i.categoryId)?.name || 'Uncategorized' : 'Uncategorized'}</div>
+            <div class="muted">${money(i.price)} · Qty ${i.availableQuantity ?? 0}</div>
+            <div class="flex" style="margin-top:10px;gap:8px;flex-wrap:wrap">
+              <input type="number" min="0" value="${i.availableQuantity ?? 0}" id="qty-${i.id}" style="width:80px">
+              <button class="btn btn-outline btn-sm" onclick="updateStock('${i.id}', 'decrease')">−</button>
+              <button class="btn btn-outline btn-sm" onclick="updateStock('${i.id}', 'increase')">+</button>
+              <button class="btn btn-primary btn-sm" onclick="saveStock('${i.id}')">Save</button>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="section-title">Your submissions</div>
+    <div class="grid grid-3">
+      ${state.menuItems.filter(i=>i.submittedBy==='chef').map(i => `
+        <div class="card">
+          <div class="flex-between"><strong>${i.name}</strong><span class="badge ${i.status==='live'?'accepted':i.status==='pending_approval'?'pending_acceptance':'rejected'}">${statusLabel(i.status)}</span></div>
+          <div class="muted">${money(i.price)} · ${i.mode.replace('_',' ')}</div>
+        </div>`).join('') || '<p class="muted">No submissions yet.</p>'}
+    </div>
+  `;
+}
+async function saveStock(itemId) {
+  const input = document.getElementById(`qty-${itemId}`);
+  const value = Number(input?.value || 0);
+  try {
+    await Api.patch(`/menu/${user.branchId}/items/${itemId}/stock`, { availableQuantity: value });
+    toast('Stock updated'); await refresh();
+  } catch (e) { toast(e.message); }
+}
+function updateStock(itemId, action) {
+  const input = document.getElementById(`qty-${itemId}`);
+  if (!input) return;
+  const current = Number(input.value || 0);
+  input.value = action === 'increase' ? current + 1 : Math.max(0, current - 1);
+}
+async function submitItem() {
+  try {
+    await Api.post(`/menu/${user.branchId}/items`, {
+      name: document.getElementById('mName').value,
+      price: document.getElementById('mPrice').value,
+      categoryId: document.getElementById('mCat').value,
+      mode: document.getElementById('mMode').value,
+      veg: document.getElementById('mVeg').value === 'true',
+      prepTime: document.getElementById('mPrep').value,
+      description: document.getElementById('mDesc').value,
+    });
+    toast('Sent to Sub-Admin for approval');
+    await refresh(); renderMenuAdmin();
+  } catch (e) { toast(e.message); }
+}
+
+function renderChefInventory() {
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Ingredient availability — your read on the kitchen</div>
+    <p class="muted" style="margin-top:-8px">Numeric stock is tracked by Inventory Manager. Use this to flag how it actually feels
+      during service — Sub-Admin and Inventory Manager see this instantly.</p>
+    <div class="grid grid-3">
+      ${(state.ingredients || []).map(i => `
+        <div class="card">
+          <div class="flex-between"><strong>${i.name}</strong><span class="muted">${i.stock} ${i.unit}</span></div>
+          <div class="flex" style="margin-top:10px;gap:6px">
+            ${['low','medium','heavy'].map(lvl => `
+              <button class="btn btn-sm ${i.chefStockLevel===lvl ? 'btn-primary' : 'btn-outline'}" onclick="setChefRating('${i.id}','${lvl}')">${lvl[0].toUpperCase()+lvl.slice(1)}</button>
+            `).join('')}
+          </div>
+          ${i.chefStockLevel ? `<div class="muted" style="margin-top:6px;font-size:0.75rem">Marked ${i.chefStockLevel} by ${i.chefStockLevelBy || 'a chef'} · ${timeAgo(i.chefStockLevelAt)}</div>` : '<div class="muted" style="margin-top:6px;font-size:0.75rem">Not rated yet</div>'}
+        </div>`).join('') || '<p class="muted">No ingredients set up yet.</p>'}
+    </div>
+  `;
+}
+async function setChefRating(ingredientId, level) {
+  try {
+    await Api.patch(`/inventory/${user.branchId}/${ingredientId}/chef-rating`, { level });
+    toast(`Marked ${level}`); await refresh();
+  } catch (e) { toast(e.message); }
+}
+
+function renderHistory() {
+  const done = state.orders.filter(o => ['completed','rejected','cancelled'].includes(o.status));
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Order history</div>
+    <div class="grid grid-3">
+      ${done.map(o => `
+        <div class="ticket">
+          <div class="ticket-head"><span class="ticket-num">${o.orderNumber}</span><span class="badge ${o.status}">${statusLabel(o.status)}</span></div>
+          <div class="ticket-body">${o.items.map(i=>`<div class="ticket-item"><span>${i.qty}× ${i.name}</span></div>`).join('')}</div>
+        </div>`).join('') || '<p class="muted">No completed orders yet.</p>'}
+    </div>`;
+}
+
+init();
+</script>
+</body>
+</html>

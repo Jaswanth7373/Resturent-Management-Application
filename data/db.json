@@ -1,0 +1,1646 @@
+{
+  "users": [
+    {
+      "id": "2NTyw3WLryrZNYVNJI91X",
+      "role": "super_admin",
+      "name": "Ava Superadmin",
+      "email": "super@demo.com",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "passwordHash": "$2b$08$M6ZI69.RcnwgK0zql1mL8elTmjCwefYzY3kZCmn.eHEgHGjEeQ6aC",
+      "active": true
+    },
+    {
+      "id": "X9UWQQPltxIEnP_1ofr4z",
+      "role": "restaurant_admin",
+      "name": "Raj RestaurantAdmin",
+      "email": "admin@demo.com",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "passwordHash": "$2b$08$iWD4XjppYroyPbdUkUsbNew2vbEEmFNNshb/d4P3pBtWaWlphVXQe",
+      "active": true
+    },
+    {
+      "id": "1_LC_MhFVEXQaS_id-pVW",
+      "role": "sub_admin",
+      "name": "Sara SubAdmin",
+      "email": "subadmin@demo.com",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "passwordHash": "$2b$08$fcFAsrfFbSp4Of3n0sRYXeyjvMjdnEO0PTMYMxDYXI1FbMUfBxtLG",
+      "active": true
+    },
+    {
+      "id": "U6dJ_zMFGgvHnfsOcMS9W",
+      "role": "waiter",
+      "name": "Wes Waiter",
+      "email": "waiter@demo.com",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "passwordHash": "$2b$08$rsI04MP0P4v9Kf2iqSrsm.VcqdfrKY7CvRI6v1AzrYp1nkF4QvVIa",
+      "active": true
+    },
+    {
+      "id": "XzUoe1ueAYqYQ38gqXA_2",
+      "role": "waiter",
+      "name": "Nina Waiter",
+      "email": "waiter2@demo.com",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "passwordHash": "$2b$08$LLqCBc9wrCS/cW0VI.0TFOcY7XKJ0QnUXbKFSIZs4ZauoC5n4EpIu",
+      "active": true
+    },
+    {
+      "id": "Wfj6V-jWM-07_K9Yegx6A",
+      "role": "chef",
+      "name": "Chen Chef",
+      "email": "chef@demo.com",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "passwordHash": "$2b$08$anytdb5aJ1fK0Dnq8YXgHeXZjbq39/9SUW4Xe9Iq2UUHOXBobhULy",
+      "active": true
+    },
+    {
+      "id": "xcmhXbn4vuPnjXDsgqceg",
+      "role": "inventory_manager",
+      "name": "Ivy Inventory",
+      "email": "inventory@demo.com",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "passwordHash": "$2b$08$m7UAYtRWSSFan3QVpDkqZ.e7ddyb5erDa2XpomTlHuzJfCVVkHzNe",
+      "active": true
+    },
+    {
+      "id": "_aioHWu7DgpqHPvzQe4H5",
+      "role": "customer",
+      "name": "Cathy Customer",
+      "email": "customer@demo.com",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "passwordHash": "$2b$08$znXxnJhhmX0dzuJbTnOv3eO8X1.zgZY7pStTRQ3zf.5IYc3kLVyk2",
+      "active": true
+    },
+    {
+      "id": "vuk1IUdV6V62rPI728Wke",
+      "name": "RN Tester",
+      "email": "rn.tester+1@example.com",
+      "phone": "",
+      "role": "customer",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "passwordHash": "$2b$08$e7WWzJgA2zi3xaTxrJ/9qe/l.7d609PkzCA/ZpJ6C73B0wOZ7NE0y",
+      "active": true
+    }
+  ],
+  "restaurants": [
+    {
+      "id": "gviu7vOOqi622StUAfADP",
+      "name": "The Copper Fork",
+      "cuisine": "Multi-Cuisine",
+      "type": "Casual Dining",
+      "description": "A warm, brass-and-timber neighbourhood restaurant serving Indian and continental favourites for dine-in and take-away.",
+      "tags": [
+        "Family Friendly",
+        "Pocket Friendly",
+        "Rooftop"
+      ],
+      "rating": 4.5,
+      "priceRange": "₹₹",
+      "isOpen": true,
+      "closingTime": "23:00",
+      "operatingHours": {
+        "mon": {
+          "open": "10:00",
+          "close": "23:00",
+          "closed": false
+        },
+        "tue": {
+          "open": "10:00",
+          "close": "23:00",
+          "closed": false
+        },
+        "wed": {
+          "open": "10:00",
+          "close": "23:00",
+          "closed": false
+        },
+        "thu": {
+          "open": "10:00",
+          "close": "23:00",
+          "closed": false
+        },
+        "fri": {
+          "open": "10:00",
+          "close": "23:30",
+          "closed": false
+        },
+        "sat": {
+          "open": "10:00",
+          "close": "23:30",
+          "closed": false
+        },
+        "sun": {
+          "open": "10:00",
+          "close": "22:30",
+          "closed": false
+        }
+      },
+      "status": "active",
+      "createdAt": "2026-07-27T08:07:54.204Z"
+    }
+  ],
+  "branches": [
+    {
+      "id": "ggpKhRHf9XqeUXuOvcHd1",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "name": "MG Road Branch",
+      "address": "MG Road, Bengaluru"
+    }
+  ],
+  "tables": [
+    {
+      "id": "nS4vHwqsGvfek5WgIFrgp",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "number": 1,
+      "seats": 2,
+      "status": "available",
+      "assignedWaiterId": null,
+      "qrCode": "TABLE-ggpKhRHf9XqeUXuOvcHd1-1"
+    },
+    {
+      "id": "6rkdxrERCGJSpzYUhCL0-",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "number": 2,
+      "seats": 2,
+      "status": "available",
+      "assignedWaiterId": null,
+      "qrCode": "TABLE-ggpKhRHf9XqeUXuOvcHd1-2"
+    },
+    {
+      "id": "ew-YqXZHTtprt3yFN8kOt",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "number": 3,
+      "seats": 4,
+      "status": "available",
+      "assignedWaiterId": null,
+      "qrCode": "TABLE-ggpKhRHf9XqeUXuOvcHd1-3"
+    },
+    {
+      "id": "eyF0J_uXeDGh4aSTl6U7a",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "number": 4,
+      "seats": 4,
+      "status": "available",
+      "assignedWaiterId": null,
+      "qrCode": "TABLE-ggpKhRHf9XqeUXuOvcHd1-4"
+    },
+    {
+      "id": "hqXLqJqp7XEYOytDWvlJz",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "number": 5,
+      "seats": 6,
+      "status": "available",
+      "assignedWaiterId": null,
+      "qrCode": "TABLE-ggpKhRHf9XqeUXuOvcHd1-5"
+    },
+    {
+      "id": "whcD9KQ3D3LbHqvSbzbgI",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "number": 6,
+      "seats": 8,
+      "status": "available",
+      "assignedWaiterId": null,
+      "qrCode": "TABLE-ggpKhRHf9XqeUXuOvcHd1-6"
+    }
+  ],
+  "menuCategories": [
+    {
+      "id": "MK-Tm1-v5hQwL3Ef3WPvQ",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Starters"
+    },
+    {
+      "id": "LSR_SBIHGwe1zHkvIbwvs",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Main Course"
+    },
+    {
+      "id": "uhvHGqvoSRV5YMp6M6oEh",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Breakfast"
+    },
+    {
+      "id": "KU2Jno2PaUy4K7B63OD1S",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Desserts"
+    },
+    {
+      "id": "JKUJeYVWecqHLjZo4-lM1",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Drinks"
+    }
+  ],
+  "menuItems": [
+    {
+      "id": "MH7T2u7vHmTmJe3FRZoKE",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "categoryId": "MK-Tm1-v5hQwL3Ef3WPvQ",
+      "name": "Paneer Tikka",
+      "description": "Chargrilled cottage cheese with spices.",
+      "price": 249,
+      "veg": true,
+      "mode": "both",
+      "status": "live",
+      "prepTime": 15,
+      "recipe": [
+        {
+          "ingredientId": "9sOINRzENgZbcKvD1Zfmk",
+          "qty": 0.2
+        }
+      ],
+      "submittedBy": null,
+      "rating": "4.4",
+      "availableQuantity": 8,
+      "availabilityStatus": "low_stock",
+      "updatedBy": "Wfj6V-jWM-07_K9Yegx6A",
+      "updatedAt": "2026-08-25T07:27:03.360Z",
+      "stockScheduledUntil": null,
+      "limitedQuantity": 8
+    },
+    {
+      "id": "XdIp2gIqJjZTYoA-7WVMi",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "categoryId": "MK-Tm1-v5hQwL3Ef3WPvQ",
+      "name": "Chicken 65",
+      "description": "Spicy deep-fried chicken bites.",
+      "price": 279,
+      "veg": false,
+      "mode": "both",
+      "status": "live",
+      "prepTime": 18,
+      "recipe": [
+        {
+          "ingredientId": "2OdSc_cgp8KaUyZWs5mjg",
+          "qty": 0.25
+        }
+      ],
+      "submittedBy": null,
+      "rating": "4.9",
+      "availableQuantity": 12,
+      "availabilityStatus": "available",
+      "updatedBy": "Wfj6V-jWM-07_K9Yegx6A",
+      "updatedAt": "2026-07-29T09:30:15.744Z",
+      "stockScheduledUntil": null,
+      "limitedQuantity": 12
+    },
+    {
+      "id": "KvSinQrpETyAndENLGBe8",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "categoryId": "LSR_SBIHGwe1zHkvIbwvs",
+      "name": "Butter Chicken",
+      "description": "Creamy tomato chicken curry.",
+      "price": 399,
+      "veg": false,
+      "mode": "both",
+      "status": "live",
+      "prepTime": 25,
+      "recipe": [
+        {
+          "ingredientId": "2OdSc_cgp8KaUyZWs5mjg",
+          "qty": 0.3
+        }
+      ],
+      "submittedBy": null,
+      "rating": "4.6",
+      "availableQuantity": 12,
+      "availabilityStatus": "available",
+      "updatedBy": null,
+      "updatedAt": "2026-07-29T10:28:27.170Z",
+      "stockScheduledUntil": null,
+      "limitedQuantity": 12
+    },
+    {
+      "id": "9DacwbwUSPf7oT55cIev0",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "categoryId": "LSR_SBIHGwe1zHkvIbwvs",
+      "name": "Veg Biryani",
+      "description": "Fragrant basmati rice with vegetables.",
+      "price": 299,
+      "veg": true,
+      "mode": "both",
+      "status": "live",
+      "prepTime": 30,
+      "recipe": [
+        {
+          "ingredientId": "V1PmSNPPC4vWwVzv6jO9q",
+          "qty": 0.35
+        }
+      ],
+      "submittedBy": null,
+      "rating": "4.1",
+      "availableQuantity": 12,
+      "availabilityStatus": "available",
+      "updatedBy": null,
+      "updatedAt": "2026-07-29T09:29:41.712Z",
+      "stockScheduledUntil": null,
+      "limitedQuantity": 12
+    },
+    {
+      "id": "gzXXpMIyz0FOl4iSpQY30",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "categoryId": "uhvHGqvoSRV5YMp6M6oEh",
+      "name": "Masala Dosa",
+      "description": "Crispy rice crepe with potato filling.",
+      "price": 149,
+      "veg": true,
+      "mode": "dine_in",
+      "status": "live",
+      "prepTime": 12,
+      "recipe": [
+        {
+          "ingredientId": "V1PmSNPPC4vWwVzv6jO9q",
+          "qty": 0.15
+        }
+      ],
+      "submittedBy": null,
+      "rating": "4.3",
+      "availableQuantity": 13,
+      "availabilityStatus": "available",
+      "updatedBy": "Wfj6V-jWM-07_K9Yegx6A",
+      "updatedAt": "2026-07-29T09:30:21.060Z",
+      "stockScheduledUntil": null,
+      "limitedQuantity": 13
+    },
+    {
+      "id": "SZUkMSAbz4aSlHJzK5dvL",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "categoryId": "KU2Jno2PaUy4K7B63OD1S",
+      "name": "Chocolate Lava Cake",
+      "description": "Warm cake with molten chocolate center.",
+      "price": 179,
+      "veg": true,
+      "mode": "both",
+      "status": "live",
+      "prepTime": 10,
+      "recipe": [
+        {
+          "ingredientId": "vcWfmW-yC6zFqIIjeoiqx",
+          "qty": 0.08
+        },
+        {
+          "ingredientId": "ekzGhXXR3Ucl1Jg-EHUB0",
+          "qty": 0.1
+        }
+      ],
+      "submittedBy": null,
+      "rating": "4.7",
+      "availableQuantity": 11,
+      "availabilityStatus": "available",
+      "updatedBy": "Wfj6V-jWM-07_K9Yegx6A",
+      "updatedAt": "2026-07-29T09:30:26.703Z",
+      "stockScheduledUntil": null,
+      "limitedQuantity": 11
+    },
+    {
+      "id": "Saxql4qeEiqwsHY8--8d2",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "categoryId": "JKUJeYVWecqHLjZo4-lM1",
+      "name": "Cold Coffee",
+      "description": "Chilled coffee blended with ice cream.",
+      "price": 129,
+      "veg": true,
+      "mode": "both",
+      "status": "live",
+      "prepTime": 5,
+      "recipe": [
+        {
+          "ingredientId": "Y17E5s6T6wGM9A0XNLf3R",
+          "qty": 0.2
+        }
+      ],
+      "submittedBy": null,
+      "rating": "4.9",
+      "availableQuantity": 10,
+      "availabilityStatus": "low_stock",
+      "updatedBy": "Wfj6V-jWM-07_K9Yegx6A",
+      "updatedAt": "2026-07-29T09:30:32.224Z",
+      "stockScheduledUntil": null,
+      "limitedQuantity": 10
+    },
+    {
+      "id": "AV7eY1Yk5EWpL-w2yBd-Q",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "categoryId": "MK-Tm1-v5hQwL3Ef3WPvQ",
+      "name": "Truffle Fries",
+      "description": "Crispy fries tossed in truffle oil.",
+      "price": 219,
+      "veg": true,
+      "mode": "both",
+      "status": "live",
+      "prepTime": 12,
+      "recipe": [],
+      "submittedBy": "chef",
+      "rating": "4.1",
+      "availableQuantity": 11,
+      "availabilityStatus": "available",
+      "updatedBy": "1_LC_MhFVEXQaS_id-pVW",
+      "updatedAt": "2026-07-28T10:07:00.991Z",
+      "stockScheduledUntil": null
+    },
+    {
+      "id": "PToRCiGrkkOQokpe2S9eg",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "categoryId": "MK-Tm1-v5hQwL3Ef3WPvQ",
+      "name": "fish",
+      "description": "best sea food",
+      "price": 350,
+      "veg": false,
+      "mode": "both",
+      "status": "live",
+      "prepTime": 15,
+      "recipe": [],
+      "submittedBy": "chef",
+      "rating": null,
+      "availabilityWindow": "all_day",
+      "seasonal": false,
+      "limitedQuantity": 15,
+      "availableQuantity": 15,
+      "availabilityStatus": "available",
+      "updatedBy": "1_LC_MhFVEXQaS_id-pVW",
+      "updatedAt": "2026-07-28T10:10:01.069Z",
+      "stockScheduledUntil": null
+    },
+    {
+      "id": "PhfJyTQMj-r_sYgWOgTSJ",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "categoryId": "MK-Tm1-v5hQwL3Ef3WPvQ",
+      "name": "Prawns",
+      "description": "Popcorn",
+      "price": 300,
+      "veg": false,
+      "mode": "both",
+      "status": "live",
+      "prepTime": 15,
+      "recipe": [],
+      "submittedBy": "chef",
+      "rating": null,
+      "availabilityWindow": "all_day",
+      "seasonal": false,
+      "limitedQuantity": 15,
+      "availableQuantity": 15,
+      "availabilityStatus": "available",
+      "updatedBy": "X9UWQQPltxIEnP_1ofr4z",
+      "updatedAt": "2026-07-29T09:31:21.149Z",
+      "stockScheduledUntil": null
+    }
+  ],
+  "ingredients": [
+    {
+      "id": "9sOINRzENgZbcKvD1Zfmk",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Paneer",
+      "unit": "kg",
+      "stock": 18.000000000000007,
+      "lowStockThreshold": 5
+    },
+    {
+      "id": "2OdSc_cgp8KaUyZWs5mjg",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Chicken",
+      "unit": "kg",
+      "stock": 14.25,
+      "lowStockThreshold": 5
+    },
+    {
+      "id": "V1PmSNPPC4vWwVzv6jO9q",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Rice",
+      "unit": "kg",
+      "stock": 49.5,
+      "lowStockThreshold": 10
+    },
+    {
+      "id": "ekzGhXXR3Ucl1Jg-EHUB0",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Flour",
+      "unit": "kg",
+      "stock": 30,
+      "lowStockThreshold": 8
+    },
+    {
+      "id": "Y17E5s6T6wGM9A0XNLf3R",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Milk",
+      "unit": "l",
+      "stock": 25,
+      "lowStockThreshold": 5
+    },
+    {
+      "id": "vcWfmW-yC6zFqIIjeoiqx",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Cocoa",
+      "unit": "kg",
+      "stock": 4,
+      "lowStockThreshold": 2
+    }
+  ],
+  "orders": [
+    {
+      "id": "A45dgHUbUw1-RQP1F5J0B",
+      "orderNumber": "ORD-470647",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Guest",
+      "items": [
+        {
+          "menuItemId": "MH7T2u7vHmTmJe3FRZoKE",
+          "name": "Paneer Tikka",
+          "price": 249,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 249
+        }
+      ],
+      "subtotal": 249,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 12,
+      "packingCharge": 0,
+      "total": 261,
+      "status": "completed",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-27T08:10:26.782Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-27T08:10:26.782Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-27T08:11:10.192Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-27T08:11:14.487Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-27T08:11:15.711Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-27T08:11:29.524Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-27T08:11:31.214Z"
+        }
+      ],
+      "payments": [
+        {
+          "amount": 261,
+          "method": "cash",
+          "payerLabel": null,
+          "at": "2026-07-27T08:11:20.071Z"
+        }
+      ]
+    },
+    {
+      "id": "EJqWyhQgqpQ0aU7z-86pi",
+      "orderNumber": "ORD-147905",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "XdIp2gIqJjZTYoA-7WVMi",
+          "name": "Chicken 65",
+          "price": 279,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 279
+        }
+      ],
+      "subtotal": 279,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 14,
+      "packingCharge": 0,
+      "total": 293,
+      "status": "completed",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-27T09:29:54.518Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-27T09:29:54.518Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-27T09:31:36.936Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-27T09:31:45.189Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-27T09:31:55.425Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-27T09:32:10.282Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-27T09:32:12.315Z"
+        }
+      ],
+      "payments": [
+        {
+          "amount": 293,
+          "method": "cash",
+          "payerLabel": null,
+          "at": "2026-07-27T09:32:01.955Z"
+        }
+      ]
+    },
+    {
+      "id": "hWEIidWHhIfS2IolxdcyY",
+      "orderNumber": "ORD-930027",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "MH7T2u7vHmTmJe3FRZoKE",
+          "name": "Paneer Tikka",
+          "price": 249,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 249
+        }
+      ],
+      "subtotal": 249,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 12,
+      "packingCharge": 0,
+      "total": 261,
+      "status": "completed",
+      "paymentStatus": "unpaid",
+      "paymentMethod": null,
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-27T09:51:56.546Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-27T09:51:56.546Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-27T09:52:26.205Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-27T09:52:28.662Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-27T09:52:30.291Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-27T09:52:50.492Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-27T09:52:55.453Z"
+        }
+      ]
+    },
+    {
+      "id": "fV7YOMhCC2JOXxrS8A1HX",
+      "orderNumber": "ORD-487913",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "MH7T2u7vHmTmJe3FRZoKE",
+          "name": "Paneer Tikka",
+          "price": 249,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 249
+        }
+      ],
+      "subtotal": 249,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 12,
+      "packingCharge": 0,
+      "total": 261,
+      "status": "completed",
+      "paymentStatus": "unpaid",
+      "paymentMethod": null,
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-27T11:02:37.782Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-27T11:02:37.782Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-27T11:45:44.430Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-27T11:45:48.341Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-27T11:45:48.824Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-27T13:17:05.176Z"
+        }
+      ]
+    },
+    {
+      "id": "-5nHOp-3G_ZlEw6Il9qjl",
+      "orderNumber": "ORD-924447",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "MH7T2u7vHmTmJe3FRZoKE",
+          "name": "Paneer Tikka",
+          "price": 249,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 249
+        }
+      ],
+      "subtotal": 249,
+      "discount": 25,
+      "couponCode": "WELCOME10",
+      "tax": 11,
+      "packingCharge": 0,
+      "total": 235,
+      "status": "completed",
+      "paymentStatus": "unpaid",
+      "paymentMethod": null,
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-27T11:32:05.108Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-27T11:32:05.108Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-27T11:45:43.352Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-27T11:45:47.292Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-27T11:45:47.864Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-27T12:05:20.918Z"
+        }
+      ]
+    },
+    {
+      "id": "nYla4t6WIgDGXts38vXMU",
+      "orderNumber": "ORD-276771",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "6rkdxrERCGJSpzYUhCL0-",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "MH7T2u7vHmTmJe3FRZoKE",
+          "name": "Paneer Tikka",
+          "price": 249,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 249
+        }
+      ],
+      "subtotal": 249,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 12,
+      "packingCharge": 0,
+      "total": 261,
+      "status": "completed",
+      "paymentStatus": "unpaid",
+      "paymentMethod": null,
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-27T11:42:12.068Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-27T11:42:12.068Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-27T11:45:41.121Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-27T11:45:45.781Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-27T11:45:46.501Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-28T06:42:01.593Z"
+        }
+      ]
+    },
+    {
+      "id": "hHQ-KePyUunr_2B44t6jT",
+      "orderNumber": "ORD-141904",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "MH7T2u7vHmTmJe3FRZoKE",
+          "name": "Paneer Tikka",
+          "price": 249,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 249
+        }
+      ],
+      "subtotal": 249,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 12,
+      "packingCharge": 0,
+      "total": 261,
+      "status": "completed",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-27T11:55:39.956Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-27T11:55:39.956Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-27T11:55:52.891Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-27T11:55:53.888Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-27T11:55:55.128Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-27T12:04:29.694Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-27T12:05:15.544Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-27T12:05:17.308Z"
+        }
+      ]
+    },
+    {
+      "id": "rTivsQwVzZUwWJIjYQezB",
+      "orderNumber": "ORD-178264",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "6rkdxrERCGJSpzYUhCL0-",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "XdIp2gIqJjZTYoA-7WVMi",
+          "name": "Chicken 65",
+          "price": 279,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 279
+        },
+        {
+          "menuItemId": "XdIp2gIqJjZTYoA-7WVMi",
+          "name": "Chicken 65",
+          "price": 279,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 279
+        }
+      ],
+      "subtotal": 558,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 28,
+      "packingCharge": 0,
+      "total": 586,
+      "status": "completed",
+      "paymentStatus": "paid",
+      "paymentMethod": "upi",
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-27T12:03:57.821Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-27T12:03:57.821Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-27T12:04:43.395Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-27T12:04:43.980Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-27T12:04:44.627Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-27T12:05:32.007Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-28T06:41:51.290Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-28T06:41:54.103Z"
+        }
+      ]
+    },
+    {
+      "id": "9oeMfdMcXaun1gKaC5Pje",
+      "orderNumber": "ORD-711476",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "take_away",
+      "tableId": null,
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "XdIp2gIqJjZTYoA-7WVMi",
+          "name": "Chicken 65",
+          "price": 279,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 279
+        }
+      ],
+      "subtotal": 279,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 14,
+      "packingCharge": 20,
+      "total": 313,
+      "status": "completed",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-27T12:06:15.440Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-27T12:06:15.440Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-27T12:06:20.975Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-27T12:06:21.831Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-27T12:06:44.349Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-27T12:20:44.521Z"
+        }
+      ]
+    },
+    {
+      "id": "XN9lI93TefSDyjrB0nAgy",
+      "orderNumber": "ORD-992002",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "MH7T2u7vHmTmJe3FRZoKE",
+          "name": "Paneer Tikka",
+          "price": 249,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 249
+        }
+      ],
+      "subtotal": 249,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 12,
+      "packingCharge": 0,
+      "total": 261,
+      "status": "completed",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-27T13:16:34.983Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-27T13:16:34.984Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-27T13:16:42.446Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-27T13:16:43.149Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-27T13:16:43.709Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-27T13:17:00.750Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-27T13:17:02.171Z"
+        }
+      ]
+    },
+    {
+      "id": "fIHD3Bx55AE3-uCAwDCV4",
+      "orderNumber": "ORD-728444",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "MH7T2u7vHmTmJe3FRZoKE",
+          "name": "Paneer Tikka",
+          "price": 249,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 249
+        }
+      ],
+      "subtotal": 249,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 12,
+      "packingCharge": 0,
+      "total": 261,
+      "status": "completed",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-28T08:20:26.866Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-28T08:20:26.866Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-28T08:20:38.225Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-28T08:20:43.837Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-28T08:20:45.361Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-28T08:21:10.447Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-28T08:21:13.495Z"
+        }
+      ]
+    },
+    {
+      "id": "v08Zb4guKWvfmyq9-7tI1",
+      "orderNumber": "ORD-465534",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "MH7T2u7vHmTmJe3FRZoKE",
+          "name": "Paneer Tikka",
+          "price": 249,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 249
+        }
+      ],
+      "subtotal": 249,
+      "discount": 25,
+      "couponCode": "WELCOME10",
+      "tax": 11,
+      "packingCharge": 0,
+      "total": 235,
+      "status": "completed",
+      "paymentStatus": "paid",
+      "paymentMethod": "card",
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-29T07:47:05.630Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-29T07:47:05.630Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-29T07:47:15.241Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-29T07:47:18.289Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-29T07:47:20.943Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-29T07:50:40.911Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-29T07:50:43.713Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-29T07:50:48.979Z"
+        }
+      ]
+    },
+    {
+      "id": "feEFA6gOjf8X5DWo0pYGK",
+      "orderNumber": "ORD-378582",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "gzXXpMIyz0FOl4iSpQY30",
+          "name": "Masala Dosa",
+          "price": 149,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 149
+        }
+      ],
+      "subtotal": 149,
+      "discount": 15,
+      "couponCode": "WELCOME10",
+      "tax": 7,
+      "packingCharge": 0,
+      "total": 141,
+      "status": "completed",
+      "paymentStatus": "unpaid",
+      "paymentMethod": null,
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-29T09:27:03.703Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-29T09:27:03.703Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-29T09:27:09.104Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-29T09:27:56.333Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-29T09:28:00.164Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-07-29T09:28:07.037Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-29T09:28:09.550Z"
+        }
+      ]
+    },
+    {
+      "id": "AZacctqcirbhRAU1uG1lp",
+      "orderNumber": "ORD-891048",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "take_away",
+      "tableId": null,
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "9DacwbwUSPf7oT55cIev0",
+          "name": "Veg Biryani",
+          "price": 299,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 299
+        }
+      ],
+      "subtotal": 299,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 15,
+      "packingCharge": 20,
+      "total": 334,
+      "status": "completed",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "scheduledFor": "21:50",
+      "notes": "",
+      "createdAt": "2026-07-29T09:28:54.364Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-29T09:28:54.364Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-07-29T09:28:58.229Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-07-29T09:29:04.692Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-07-29T09:29:06.415Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-07-29T09:29:41.709Z"
+        }
+      ]
+    },
+    {
+      "id": "5ji34sBFbOWCX0a3sI3Ok",
+      "orderNumber": "ORD-959031",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "KvSinQrpETyAndENLGBe8",
+          "name": "Butter Chicken",
+          "price": 399,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 399
+        }
+      ],
+      "subtotal": 399,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 20,
+      "packingCharge": 0,
+      "total": 419,
+      "status": "cancelled",
+      "paymentStatus": "unpaid",
+      "paymentMethod": null,
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-29T10:28:19.716Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-29T10:28:19.716Z"
+        },
+        {
+          "status": "cancelled",
+          "at": "2026-07-29T10:28:27.170Z"
+        }
+      ]
+    },
+    {
+      "id": "bf6GbH7wl6N1VLeVmpUhL",
+      "orderNumber": "ORD-961880",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "MH7T2u7vHmTmJe3FRZoKE",
+          "name": "Paneer Tikka",
+          "price": 249,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 249
+        }
+      ],
+      "subtotal": 249,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 12,
+      "packingCharge": 0,
+      "total": 261,
+      "status": "rejected",
+      "paymentStatus": "unpaid",
+      "paymentMethod": null,
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-07-29T11:13:26.907Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-07-29T11:13:26.907Z"
+        },
+        {
+          "status": "rejected",
+          "at": "2026-08-24T07:54:56.119Z"
+        }
+      ],
+      "rejectionReason": "Item out of stock"
+    },
+    {
+      "id": "DC3JuFQrakiM74ChcjwgO",
+      "orderNumber": "ORD-713051",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "mode": "dine_in",
+      "tableId": "nS4vHwqsGvfek5WgIFrgp",
+      "customerName": "Cathy Customer",
+      "items": [
+        {
+          "menuItemId": "MH7T2u7vHmTmJe3FRZoKE",
+          "name": "Paneer Tikka",
+          "price": 249,
+          "qty": 1,
+          "specialInstructions": "",
+          "lineTotal": 249
+        }
+      ],
+      "subtotal": 249,
+      "discount": 0,
+      "couponCode": null,
+      "tax": 12,
+      "packingCharge": 0,
+      "total": 261,
+      "status": "completed",
+      "paymentStatus": "unpaid",
+      "paymentMethod": null,
+      "scheduledFor": null,
+      "notes": "",
+      "createdAt": "2026-08-25T07:25:07.871Z",
+      "statusHistory": [
+        {
+          "status": "pending_acceptance",
+          "at": "2026-08-25T07:25:07.871Z"
+        },
+        {
+          "status": "accepted",
+          "at": "2026-08-25T07:26:23.418Z"
+        },
+        {
+          "status": "preparing",
+          "at": "2026-08-25T07:26:27.587Z"
+        },
+        {
+          "status": "ready",
+          "at": "2026-08-25T07:26:31.301Z"
+        },
+        {
+          "status": "served",
+          "at": "2026-08-25T07:26:51.138Z"
+        },
+        {
+          "status": "completed",
+          "at": "2026-08-25T07:27:03.355Z"
+        }
+      ]
+    }
+  ],
+  "reservations": [],
+  "reviews": [],
+  "auditLogs": [],
+  "favorites": [],
+  "coupons": [
+    {
+      "id": "3Jcc7HULPOBomMx5b1YM5",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "code": "WELCOME10",
+      "discountType": "percentage",
+      "discountValue": 10,
+      "description": "Welcome offer - 10% off",
+      "maxUses": 999,
+      "usedCount": 3,
+      "active": true,
+      "validTill": "2026-10-25T08:07:54.590Z"
+    },
+    {
+      "id": "1uW1KMrvzVxf6oFnYDWjt",
+      "restaurantId": "gviu7vOOqi622StUAfADP",
+      "code": "FLAT50",
+      "discountType": "fixed",
+      "discountValue": 50,
+      "description": "Flat ₹50 off on minimum order",
+      "maxUses": 500,
+      "usedCount": 0,
+      "active": true,
+      "minOrderValue": 300,
+      "validTill": "2026-09-25T08:07:54.591Z"
+    }
+  ],
+  "payments": [
+    {
+      "id": "UMpuo7fuEL8Ih4INQ2Q3v",
+      "orderId": "hHQ-KePyUunr_2B44t6jT",
+      "amount": 261,
+      "method": "cash",
+      "status": "completed",
+      "userId": "U6dJ_zMFGgvHnfsOcMS9W",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "createdAt": "2026-07-27T12:04:22.844Z"
+    },
+    {
+      "id": "iS_oAIuKtUyxoejCd9MXP",
+      "orderId": "rTivsQwVzZUwWJIjYQezB",
+      "amount": 293,
+      "method": "upi",
+      "status": "completed",
+      "userId": "U6dJ_zMFGgvHnfsOcMS9W",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "createdAt": "2026-07-27T12:05:37.947Z"
+    },
+    {
+      "id": "mCFzUmRMzpWM6WsXfxmDt",
+      "orderId": "9oeMfdMcXaun1gKaC5Pje",
+      "amount": 313,
+      "method": "cash",
+      "status": "completed",
+      "userId": "U6dJ_zMFGgvHnfsOcMS9W",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "createdAt": "2026-07-27T12:20:43.242Z"
+    },
+    {
+      "id": "KgVbtwvL7DIVGbEsVsgvc",
+      "orderId": "XN9lI93TefSDyjrB0nAgy",
+      "amount": 261,
+      "method": "cash",
+      "status": "completed",
+      "userId": "U6dJ_zMFGgvHnfsOcMS9W",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "createdAt": "2026-07-27T13:16:57.853Z"
+    },
+    {
+      "id": "n3MEfJhMr0usA8b68l2jG",
+      "orderId": "fIHD3Bx55AE3-uCAwDCV4",
+      "amount": 261,
+      "method": "cash",
+      "status": "completed",
+      "userId": "XzUoe1ueAYqYQ38gqXA_2",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "createdAt": "2026-07-28T08:21:04.465Z"
+    },
+    {
+      "id": "tPFAo3i9pn8HHCis3kDZG",
+      "orderId": "v08Zb4guKWvfmyq9-7tI1",
+      "amount": 235,
+      "method": "card",
+      "status": "completed",
+      "userId": "XzUoe1ueAYqYQ38gqXA_2",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "createdAt": "2026-07-29T07:47:40.188Z"
+    },
+    {
+      "id": "ryub3uP7ItPd9Y3pefBk9",
+      "orderId": "AZacctqcirbhRAU1uG1lp",
+      "amount": 334,
+      "method": "cash",
+      "status": "completed",
+      "userId": "_aioHWu7DgpqHPvzQe4H5",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "createdAt": "2026-07-29T09:29:16.399Z"
+    }
+  ],
+  "recommendations": [],
+  "expenses": [],
+  "attendance": [
+    {
+      "id": "pDfMgmcsKNtMs3vEdSibm",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "userId": "U6dJ_zMFGgvHnfsOcMS9W",
+      "userName": "Wes Waiter",
+      "role": "waiter",
+      "date": "2026-07-27",
+      "clockIn": "2026-07-27T12:09:20.247Z",
+      "clockOut": null
+    },
+    {
+      "id": "jtU_5Kt1aBDhymhuwc3GE",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "userId": "Wfj6V-jWM-07_K9Yegx6A",
+      "userName": "Chen Chef",
+      "role": "chef",
+      "date": "2026-07-29",
+      "clockIn": "2026-07-29T09:33:18.320Z",
+      "clockOut": "2026-08-24T09:54:13.344Z",
+      "durationMinutes": 37461
+    }
+  ],
+  "suppliers": [
+    {
+      "id": "Uxt5HAQ3GWEVzAFnWS8GN",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Fresh Farms Pvt Ltd",
+      "category": "Produce & Dairy",
+      "phone": "+91 98450 11122",
+      "email": "orders@freshfarms.example",
+      "createdAt": "2026-07-27T08:07:54.593Z"
+    },
+    {
+      "id": "aDGSEdrqCLd4TBu1h7zYl",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Coastal Meats Co.",
+      "category": "Meat & Poultry",
+      "phone": "+91 98450 33344",
+      "email": "sales@coastalmeats.example",
+      "createdAt": "2026-07-27T08:07:54.593Z"
+    },
+    {
+      "id": "TOxYbMXoPTbtXEr2Dszia",
+      "branchId": "ggpKhRHf9XqeUXuOvcHd1",
+      "name": "Grainline Wholesale",
+      "category": "Grains & Staples",
+      "phone": "+91 98450 55566",
+      "email": "hello@grainline.example",
+      "createdAt": "2026-07-27T08:07:54.594Z"
+    }
+  ],
+  "stockTransactions": [],
+  "restaurantRequests": [],
+  "purchaseOrders": []
+}

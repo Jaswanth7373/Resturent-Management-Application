@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sub-Admin — The Copper Fork</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="topbarRoot"></div>
+<div class="shell">
+  <div class="tabs" id="tabNav"></div>
+  <div id="view"></div>
+</div>
+<div class="panel-overlay" id="ingOverlay" onclick="closeIngredientDetail()"></div>
+<div class="panel" id="ingPanel"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const user = Auth.requireRole(['sub_admin', 'inventory_manager']);
+document.getElementById('topbarRoot').innerHTML = renderTopbar(user.role === 'inventory_manager' ? 'Inventory Manager' : 'Sub-Admin');
+let state = { orders: [], tables: [], menuItems: [], categories: [], ingredients: [], reservations: [], attendance: [], suppliers: [], activeTab: 'live', socket: null };
+
+window.__getAssistantLiveData = async function() {
+  const activeOrders = state.orders.filter(o => !['completed', 'cancelled', 'rejected'].includes(o.status)).length;
+  const occupiedTables = state.tables.filter(t => t.status === 'occupied').length;
+  const pendingApprovals = state.menuItems.filter(i => i.status === 'pending_approval').length;
+  return { kind: 'subadmin', activeOrders, occupiedTables, pendingApprovals };
+};
+
+async function init() {
+  state.socket = connectSocket(user.branchId);
+  ['order:new','order:updated','table:updated','menu:updated','inventory:low_stock','inventory:updated','attendance:updated'].forEach(ev =>
+    state.socket.on(ev, () => { loadAll().then(render); }));
+  mountAttendanceWidget(user.branchId);
+  await loadAll();
+  setTab('live');
+}
+async function loadAll() {
+  const [orders, tables, menu, ingredients, reservations, attendance, suppliers] = await Promise.all([
+    Api.get('/orders/' + user.branchId),
+    Api.get('/tables/' + user.branchId),
+    Api.get('/menu/' + user.branchId),
+    Api.get('/inventory/' + user.branchId),
+    Api.get('/reservations/' + user.branchId),
+    user.role === 'sub_admin' ? Api.get('/attendance/' + user.branchId) : Promise.resolve([]),
+    Api.get('/inventory/' + user.branchId + '/suppliers'),
+  ]);
+  state.orders = orders; state.tables = tables; state.menuItems = menu.items; state.categories = menu.categories;
+  state.ingredients = ingredients; state.reservations = reservations; state.attendance = attendance; state.suppliers = suppliers;
+}
+function setTab(tab) {
+  state.activeTab = tab;
+  const tabs = [ {id:'live',label:'Live Ops'}, {id:'approvals',label:'Menu Approvals'}, {id:'menu',label:'Menu Control'}, {id:'inventory',label:'Inventory'} ];
+  if (user.role === 'sub_admin') { tabs.push({ id:'attendance', label:'Attendance' }); tabs.push({ id:'staff', label:'Staff' }); }
+  document.getElementById('tabNav').innerHTML = tabs.map(t => `<button class="tab ${state.activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`).join('');
+  render();
+}
+function render() { ({live:renderLive, approvals:renderApprovals, menu:renderMenuControl, inventory:renderInventory, attendance:renderAttendance, staff:renderStaff})[state.activeTab](); }
+
+function renderStaff() {
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Your branch's staff</div>
+    <div class="grid grid-3" id="staffList"><p class="muted">Loading...</p></div>
+    <div class="section-title">Add an employee</div>
+    <div class="card" style="max-width:480px">
+      <div class="grid grid-2">
+        <div class="field"><label>Name</label><input id="staffName" placeholder="Full name"></div>
+        <div class="field"><label>Email</label><input type="email" id="staffEmail" placeholder="name@restaurant.com"></div>
+        <div class="field"><label>Role</label>
+          <select id="staffRole">
+            <option value="waiter">Waiter</option>
+            <option value="chef">Chef</option>
+            <option value="inventory_manager">Inventory Manager</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted">New accounts use the shared demo password (<code>password</code>) and appear on the sign-in page immediately.</p>
+      <button class="btn btn-primary" onclick="createStaff()">Add employee</button>
+    </div>
+  `;
+  loadStaffList();
+}
+async function loadStaffList() {
+  const list = await Api.get(`/staff/${user.branchId}`);
+  document.getElementById('staffList').innerHTML = list.map(s => `
+    <div class="card">
+      <div class="flex-between"><strong>${s.name}</strong><span class="badge ${s.active ? 'accepted' : 'rejected'}">${s.active ? 'Active' : 'Disabled'}</span></div>
+      <div class="muted">${s.email}</div>
+      <div class="muted">${s.role.replace('_',' ')}</div>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="toggleStaffActive('${s.id}', ${!s.active})">${s.active ? 'Disable' : 'Enable'}</button>
+    </div>`).join('') || '<p class="muted">No staff added yet.</p>';
+}
+async function createStaff() {
+  const name = document.getElementById('staffName').value.trim();
+  const email = document.getElementById('staffEmail').value.trim();
+  const role = document.getElementById('staffRole').value;
+  if (!name || !email) return toast('Name and email are required');
+  try {
+    const emp = await Api.post(`/staff/${user.branchId}`, { name, email, role });
+    toast(`${emp.name} added as ${role.replace('_',' ')} — they can sign in now`);
+    render();
+  } catch (e) { toast(e.message); }
+}
+async function toggleStaffActive(userId, active) {
+  try {
+    await Api.patch(`/staff/${userId}/active`, { active });
+    toast(active ? 'Account enabled' : 'Account disabled');
+    render();
+  } catch (e) { toast(e.message); }
+}
+
+function renderLive() {
+  const active = state.orders.filter(o => !['completed','cancelled','rejected'].includes(o.status));
+  const onShift = state.attendance.filter(a => !a.clockOut);
+  document.getElementById('view').innerHTML = `
+    <div class="grid grid-4">
+      <div class="card stat-card"><div class="label">Live orders</div><div class="value">${active.length}</div></div>
+      <div class="card stat-card"><div class="label">Tables occupied</div><div class="value">${state.tables.filter(t=>t.status==='occupied').length}/${state.tables.length}</div></div>
+      <div class="card stat-card"><div class="label">Pending approvals</div><div class="value">${state.menuItems.filter(i=>i.status==='pending_approval').length}</div></div>
+      <div class="card stat-card"><div class="label">Low stock items</div><div class="value">${state.ingredients.filter(i=>i.stock<=i.lowStockThreshold).length}</div></div>
+    </div>
+
+    <div class="section-title">Staff on shift now (${onShift.length})</div>
+    <div class="flex" style="flex-wrap:wrap;gap:8px">
+      ${onShift.map(a => `<span class="badge accepted">${a.userName} · ${a.role.replace('_',' ')}</span>`).join('') || '<p class="muted">No one clocked in yet.</p>'}
+    </div>
+
+    <div class="section-title">Table status</div>
+    <div class="table-map table-map-compact">${state.tables.map(t => `<div class="table-tile ${t.status}"><div class="tnum">${t.number}</div><div class="tstatus">${t.status}</div></div>`).join('')}</div>
+
+    <div class="section-title">Active orders</div>
+    <div class="grid grid-3">
+      ${active.map(o => `
+        <div class="ticket">
+          <div class="ticket-head"><span class="ticket-num">${o.orderNumber}</span><span class="badge ${o.status}">${statusLabel(o.status)}</span></div>
+          <div class="ticket-body"><div class="muted">${o.mode.replace('_',' ')} · ${o.customerName}</div>
+            ${o.items.map(i=>`<div class="ticket-item"><span>${i.qty}× ${i.name}</span></div>`).join('')}
+          </div>
+          <div class="ticket-foot flex-between"><strong>${money(o.total)}</strong><span class="muted">${timeAgo(o.createdAt)}</span></div>
+        </div>`).join('') || '<p class="muted">No active orders right now.</p>'}
+    </div>
+
+    <div class="section-title">Upcoming reservations</div>
+    <div class="grid grid-3">
+      ${state.reservations.slice(0,6).map(r => `<div class="card"><strong>${r.date} ${r.time}</strong><div class="muted">${r.customerName} · ${r.guests} guests</div></div>`).join('') || '<p class="muted">None booked.</p>'}
+    </div>
+  `;
+}
+
+function renderApprovals() {
+  const pending = state.menuItems.filter(i => i.status === 'pending_approval');
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Chef submissions awaiting approval</div>
+    <div class="grid grid-3">
+      ${pending.map(i => `
+        <div class="card">
+          <div class="flex-between"><strong>${i.name}</strong><span class="${i.veg?'veg-dot':'nonveg-dot'}"></span></div>
+          <div class="muted">${i.description || 'No description'}</div>
+          <div class="flex-between" style="margin-top:8px"><span>${money(i.price)}</span><span class="badge accepted">${i.mode.replace('_',' ')}</span></div>
+          <div class="flex" style="margin-top:10px">
+            <button class="btn btn-primary btn-sm" onclick="approveItem('${i.id}')">Approve & go live</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectItem('${i.id}')">Reject</button>
+          </div>
+        </div>`).join('') || '<div class="empty-state">No pending submissions.</div>'}
+    </div>
+  `;
+}
+async function approveItem(id) { await Api.patch(`/menu/${user.branchId}/items/${id}`, { status: 'live' }); toast('Item approved and live'); await loadAll(); render(); }
+async function rejectItem(id) { await Api.del(`/menu/${user.branchId}/items/${id}`); toast('Submission rejected'); await loadAll(); render(); }
+
+function renderMenuControl() {
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Add a new menu item</div>
+    <div class="card" style="max-width:560px">
+      <div class="grid grid-2">
+        <div class="field"><label>Name</label><input id="newItemName" placeholder="e.g. Butter Naan"></div>
+        <div class="field"><label>Price (₹)</label><input type="number" id="newItemPrice" placeholder="0"></div>
+        <div class="field"><label>Category</label>
+          <select id="newItemCategory">${state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Veg?</label><select id="newItemVeg"><option value="true">Veg</option><option value="false">Non-veg</option></select></div>
+        <div class="field"><label>Mode</label>
+          <select id="newItemMode"><option value="both">Dine-in & Take-away</option><option value="dine_in">Dine-in only</option><option value="take_away">Take-away only</option></select>
+        </div>
+        <div class="field"><label>Prep time (min)</label><input type="number" id="newItemPrep" value="15"></div>
+      </div>
+      <div class="field"><label>Description</label><textarea id="newItemDesc" rows="2" placeholder="Short description shown to customers"></textarea></div>
+      <button class="btn btn-primary" onclick="createMenuItem()">Add item — goes live immediately</button>
+    </div>
+
+    <div class="section-title">Full menu control</div>
+    <div class="grid grid-3">
+      ${state.menuItems.filter(i=>i.status!=='pending_approval').map(i => `
+        <div class="card">
+          <div class="flex-between"><strong>${i.name}</strong><span class="badge ${i.status==='live'?'accepted':'rejected'}">${statusLabel(i.status)}</span></div>
+          <div class="field" style="margin-top:8px"><label>Price</label>
+            <input type="number" value="${i.price}" onchange="updateItem('${i.id}',{price:Number(this.value)})">
+          </div>
+          <div class="field"><label>Availability</label>
+            <select onchange="updateItem('${i.id}',{mode:this.value})">
+              <option value="both" ${i.mode==='both'?'selected':''}>Dine-in & Take-away</option>
+              <option value="dine_in" ${i.mode==='dine_in'?'selected':''}>Dine-in only</option>
+              <option value="take_away" ${i.mode==='take_away'?'selected':''}>Take-away only</option>
+            </select>
+          </div>
+          <div class="field"><label>Time window</label>
+            <select onchange="updateItem('${i.id}',{availabilityWindow:this.value})">
+              ${['all_day','breakfast','lunch','dinner','happy_hour'].map(w => `<option value="${w}" ${(i.availabilityWindow||'all_day')===w?'selected':''}>${w.replace('_',' ').replace(/\\b\\w/g,c=>c.toUpperCase())}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Limited quantity today (blank = unlimited)</label>
+            <input type="number" min="0" value="${i.limitedQuantity ?? ''}" placeholder="Unlimited" onchange="updateItem('${i.id}',{limitedQuantity: this.value === '' ? null : Number(this.value)})">
+          </div>
+          <div class="flex" style="margin-top:6px;flex-wrap:wrap;gap:6px">
+            <label class="flex" style="gap:6px;font-size:0.85rem;text-transform:none;letter-spacing:0">
+              <input type="checkbox" style="width:auto" ${i.seasonal?'checked':''} onchange="updateItem('${i.id}',{seasonal:this.checked})"> Seasonal / festival item
+            </label>
+          </div>
+          <div class="flex" style="margin-top:6px;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="updateItem('${i.id}',{status:'${i.status==='live'?'hidden':'live'}'})">${i.status==='live'?'Hide item':'Unhide'}</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteMenuItem('${i.id}','${i.name.replace(/'/g, "\\'")}')">Delete</button>
+          </div>
+        </div>`).join('')}
+    </div>
+  `;
+}
+async function createMenuItem() {
+  const name = document.getElementById('newItemName').value.trim();
+  const price = Number(document.getElementById('newItemPrice').value);
+  const categoryId = document.getElementById('newItemCategory').value;
+  if (!name || !price || !categoryId) return toast('Name, price and category are required');
+  try {
+    await Api.post(`/menu/${user.branchId}/items`, {
+      name, price, categoryId,
+      veg: document.getElementById('newItemVeg').value === 'true',
+      mode: document.getElementById('newItemMode').value,
+      prepTime: Number(document.getElementById('newItemPrep').value) || 15,
+      description: document.getElementById('newItemDesc').value
+    });
+    toast('Item added and live on the menu');
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+async function deleteMenuItem(id, name) {
+  if (!confirm(`Delete "${name}" from the menu? This can't be undone.`)) return;
+  try {
+    await Api.del(`/menu/${user.branchId}/items/${id}`);
+    toast('Item deleted');
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+async function updateItem(id, patch) { await Api.patch(`/menu/${user.branchId}/items/${id}`, patch); toast('Menu updated live'); await loadAll(); }
+
+function renderInventory() {
+  const levelBadge = { heavy: 'accepted', medium: 'pending_acceptance', low: 'rejected' };
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Ingredient stock</div>
+    <div class="grid grid-3">
+      ${state.ingredients.map(i => `
+        <div class="card">
+          <div class="flex-between"><strong>${i.name}</strong>${i.stock<=i.lowStockThreshold?'<span class="badge rejected">Low</span>':'<span class="badge accepted">OK</span>'}</div>
+          <div class="muted">${i.stock} ${i.unit} in stock · threshold ${i.lowStockThreshold}${i.unit}</div>
+          ${i.chefStockLevel ? `<div style="margin-top:6px"><span class="badge ${levelBadge[i.chefStockLevel]}">Chef says: ${i.chefStockLevel}</span></div>` : ''}
+          ${user.role==='inventory_manager' ? `
+          <div class="flex" style="margin-top:8px">
+            <input type="number" id="restock-${i.id}" placeholder="Add qty" style="width:100px">
+            <button class="btn btn-outline btn-sm" onclick="restock('${i.id}')">Restock</button>
+          </div>` : ''}
+          <button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%" onclick="openIngredientDetail('${i.id}')">View details</button>
+        </div>`).join('')}
+    </div>
+  `;
+}
+async function openIngredientDetail(id) {
+  const i = state.ingredients.find(x => x.id === id);
+  if (!i) return;
+  const panel = document.getElementById('ingPanel');
+  panel.innerHTML = `<div class="flex-between"><h3 style="margin:0">${i.name}</h3><button class="btn-outline btn btn-sm" onclick="closeIngredientDetail()">✕</button></div>
+    <div class="muted">Loading history...</div>`;
+  panel.classList.add('open'); document.getElementById('ingOverlay').classList.add('open');
+
+  const [txns, purchaseOrders] = await Promise.all([
+    Api.get(`/inventory/${user.branchId}/transactions?ingredientId=${id}`),
+    Api.get(`/inventory/${user.branchId}/purchase-orders?ingredientId=${id}`)
+  ]);
+  const supName = (sid) => (state.suppliers.find(s => s.id === sid) || {}).name || '—';
+  panel.innerHTML = `
+    <div class="flex-between"><h3 style="margin:0">${i.name}</h3><button class="btn-outline btn btn-sm" onclick="closeIngredientDetail()">✕</button></div>
+    <div class="grid grid-2" style="margin-top:12px">
+      <div class="card stat-card"><div class="label">Current stock</div><div class="value" style="font-size:1.4rem">${i.stock} ${i.unit}</div></div>
+      <div class="card stat-card"><div class="label">Low-stock threshold</div><div class="value" style="font-size:1.4rem">${i.lowStockThreshold} ${i.unit}</div></div>
+    </div>
+    ${i.chefStockLevel ? `<div class="card" style="margin-top:10px">Kitchen read: <strong>${i.chefStockLevel}</strong> (set by ${i.chefStockLevelBy || 'chef'}, ${timeAgo(i.chefStockLevelAt)})</div>` : ''}
+
+    <div class="section-title">Supplier</div>
+    <div class="field"><label>Preferred supplier for this item</label>
+      <select id="ingSupplier-${id}" onchange="setPreferredSupplier('${id}', this.value)">
+        <option value="">— none set —</option>
+        ${state.suppliers.map(s => `<option value="${s.id}" ${i.preferredSupplierId===s.id?'selected':''}>${s.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="flex" style="gap:8px;align-items:flex-end">
+      <div class="field" style="flex:1"><label>Reorder qty</label><input type="number" id="ingSendQty-${id}" value="${i.suggestedReorderQty || i.lowStockThreshold * 2}"></div>
+      <button class="btn btn-primary btn-sm" onclick="sendToSupplier('${id}')">Send order to supplier</button>
+    </div>
+    <p class="muted" style="font-size:0.75rem">This logs a purchase-order record for tracking — there's no live email/SMS to the supplier in this build.</p>
+
+    ${purchaseOrders.length ? `
+    <div class="section-title">Purchase orders sent</div>
+    ${purchaseOrders.map(po => `<div class="split-row"><span>${po.qty} ${po.unit} → ${po.supplierName}</span><span class="muted">${timeAgo(po.sentAt)}</span></div>`).join('')}` : ''}
+
+    <div class="section-title">Purchase / movement history</div>
+    ${txns.length === 0 ? '<p class="muted">No movements recorded yet.</p>' : txns.map(t => `
+      <div class="split-row">
+        <span>${t.type === 'in' ? '↑ In' : '↓ Out'} ${t.qty} ${i.unit} ${t.type==='in' ? '· ' + supName(t.supplierId) : '· ' + (t.reason||'')}</span>
+        <span class="muted">${timeAgo(t.at)}</span>
+      </div>
+      ${t.batchNumber || t.expiryDate ? `<div class="muted" style="font-size:0.75rem;margin-bottom:6px">${t.batchNumber ? 'Batch ' + t.batchNumber : ''} ${t.expiryDate ? '· exp ' + t.expiryDate : ''}</div>` : ''}
+    `).join('')}
+  `;
+}
+async function setPreferredSupplier(ingredientId, supplierId) {
+  try {
+    await Api.patch(`/inventory/${user.branchId}/${ingredientId}`, { preferredSupplierId: supplierId || null });
+    toast('Preferred supplier updated');
+    await loadAll();
+  } catch (e) { toast(e.message); }
+}
+async function sendToSupplier(ingredientId) {
+  const i = state.ingredients.find(x => x.id === ingredientId);
+  const supplierId = document.getElementById(`ingSupplier-${ingredientId}`).value || i.preferredSupplierId;
+  const qty = Number(document.getElementById(`ingSendQty-${ingredientId}`).value);
+  if (!supplierId) return toast('Pick a supplier first');
+  if (!qty) return toast('Enter a quantity to order');
+  try {
+    const po = await Api.post(`/inventory/${user.branchId}/${ingredientId}/send-to-supplier`, { supplierId, qty });
+    toast(`Order sent to ${po.supplierName} for ${po.qty} ${po.unit}`);
+    await loadAll();
+    openIngredientDetail(ingredientId);
+  } catch (e) { toast(e.message); }
+}
+function closeIngredientDetail() {
+  document.getElementById('ingPanel').classList.remove('open');
+  document.getElementById('ingOverlay').classList.remove('open');
+}
+async function restock(id) {
+  const amount = document.getElementById('restock-'+id).value;
+  if (!amount) return;
+  await Api.patch(`/inventory/${user.branchId}/${id}/restock`, { amount: Number(amount) });
+  toast('Stock updated'); await loadAll(); render();
+}
+
+function renderAttendance() {
+  const byDate = {};
+  state.attendance.forEach(a => { (byDate[a.date] = byDate[a.date] || []).push(a); });
+  const dates = Object.keys(byDate).sort().reverse();
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Staff attendance</div>
+    ${dates.length === 0 ? '<div class="empty-state">No attendance recorded yet.</div>' : dates.map(date => `
+      <div class="day-group" style="margin-bottom:18px">
+        <h3>${date}</h3>
+        <div class="grid grid-3">
+          ${byDate[date].map(a => `
+            <div class="card">
+              <div class="flex-between"><strong>${a.userName}</strong><span class="badge ${a.clockOut ? 'completed' : 'accepted'}">${a.clockOut ? 'Shift ended' : 'On shift'}</span></div>
+              <div class="muted">${a.role.replace('_',' ')}</div>
+              <div class="muted" style="margin-top:6px">In: ${new Date(a.clockIn).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>
+              ${a.clockOut ? `<div class="muted">Out: ${new Date(a.clockOut).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · ${a.durationMinutes} min</div>` : ''}
+            </div>`).join('')}
+        </div>
+      </div>`).join('')}
+  `;
+}
+
+init();
+</script>
+</body>
+</html>

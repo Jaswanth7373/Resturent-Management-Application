@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — The Copper Fork</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="topbarRoot"></div>
+<div class="shell">
+  <div class="tabs" id="tabNav"></div>
+  <div id="view"></div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const user = Auth.requireRole(['restaurant_admin', 'super_admin']);
+document.getElementById('topbarRoot').innerHTML = renderTopbar(user.role === 'super_admin' ? 'Super Admin' : 'Restaurant Admin');
+let state = { 
+  summary: null, menuItems: [], categories: [], restaurants: [], users: [], 
+  payments: null, auditLogs: [], activeTab: 'revenue', socket: null,
+  dashboardData: null, restaurantRequests: []
+};
+
+window.__getAssistantLiveData = async function() {
+  const summary = state.summary || (user.branchId ? await Api.get(`/reports/${user.branchId}/summary`).catch(() => null) : null);
+  const couponCount = Array.isArray(state.coupons) ? state.coupons.length : 0;
+  return { kind: 'admin', summary, couponCount, branchCount: Array.isArray(state.branches) ? state.branches.length : 0 };
+};
+
+async function init() {
+  if (user.branchId) {
+    state.socket = connectSocket(user.branchId);
+    ['order:updated','order:new'].forEach(ev => state.socket.on(ev, () => loadAll().then(render)));
+  }
+  await loadAll();
+  setTab('revenue');
+}
+async function loadAll() {
+  const tasks = [];
+  if (user.branchId) {
+    tasks.push(Api.get(`/reports/${user.branchId}/summary`).then(r => state.summary = r).catch(err => {
+      console.warn('Could not load branch summary', err);
+      state.summary = null;
+    }));
+    tasks.push(Api.get(`/menu/${user.branchId}`).then(r => { state.menuItems = r.items; state.categories = r.categories; }).catch(err => {
+      console.warn('Could not load menu for branch', err);
+      state.menuItems = [];
+      state.categories = [];
+    }));
+  }
+  if (user.restaurantId) {
+    tasks.push(Api.get(`/branches/restaurant/${user.restaurantId}`).then(r => state.branches = r).catch(err => {
+      console.warn('Could not load restaurant branches', err);
+      state.branches = [];
+    }));
+  }
+  if (user.role === 'restaurant_admin' || user.role === 'super_admin') {
+    tasks.push(Api.get('/coupons/admin/all').then(r => state.coupons = r).catch(err => {
+      console.warn('Could not load coupons', err);
+      state.coupons = [];
+    }));
+  }
+  if (user.role === 'super_admin') {
+    tasks.push(Api.get('/superadmin/dashboard').then(r => state.dashboardData = r).catch(err => {
+      console.warn('Could not load superadmin dashboard', err);
+      state.dashboardData = null;
+    }));
+    tasks.push(Api.get('/superadmin/restaurants').then(r => state.restaurants = r).catch(err => {
+      console.warn('Could not load superadmin restaurants', err);
+      state.restaurants = [];
+    }));
+    tasks.push(Api.get('/superadmin/users').then(r => state.users = r).catch(err => {
+      console.warn('Could not load superadmin users', err);
+      state.users = [];
+    }));
+    tasks.push(Api.get('/superadmin/payments/analytics').then(r => state.payments = r).catch(err => {
+      console.warn('Could not load superadmin payments', err);
+      state.payments = null;
+    }));
+    tasks.push(Api.get('/superadmin/restaurant-requests').then(r => state.restaurantRequests = r).catch(err => {
+      console.warn('Could not load restaurant requests', err);
+      state.restaurantRequests = [];
+    }));
+    tasks.push(Api.get('/superadmin/branches').then(r => state.branches = r).catch(err => {
+      console.warn('Could not load superadmin branches', err);
+      state.branches = [];
+    }));
+  }
+  await Promise.all(tasks);
+}
+function setTab(tab) {
+  state.activeTab = tab;
+  const tabs = [ {id:'revenue',label:'Revenue & Reports'}, {id:'menu',label:'Menu Master'} ];
+  if (user.restaurantId) tabs.push({ id:'branches', label:'Branches' });
+  if (user.role === 'restaurant_admin' || user.role === 'super_admin') tabs.push({ id:'coupons', label:'Coupons & Offers' });
+  if (user.role === 'restaurant_admin' || user.role === 'super_admin') tabs.push({ id:'staff', label:'Staff' });
+  if (user.role === 'super_admin') {
+    tabs.push({ id:'platform', label:'Platform Dashboard' });
+    tabs.push({ id:'restaurants', label:'Restaurants' });
+    const pendingCount = state.restaurantRequests.filter(r => r.status === 'pending').length;
+    tabs.push({ id:'requests', label: `Restaurant Requests${pendingCount ? ' (' + pendingCount + ')' : ''}` });
+    tabs.push({ id:'users', label:'Users & Access' });
+    tabs.push({ id:'payments', label:'Payments' });
+  }
+  document.getElementById('tabNav').innerHTML = tabs.map(t => `<button class="tab ${state.activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`).join('');
+  render();
+}
+function render() { ({revenue:renderRevenue, menu:renderMenuMaster, branches:renderBranches, coupons:renderCoupons, staff:renderStaff, platform:renderPlatform, restaurants:renderRestaurants, requests:renderRestaurantRequests, users:renderUsers, payments:renderPayments})[state.activeTab](); }
+
+function renderStaff() {
+  const branches = state.branches && state.branches.length ? state.branches : [{ id: user.branchId, name: 'Main Branch' }];
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Staff</div>
+    <div class="grid grid-3" id="staffList">
+      <p class="muted">Loading...</p>
+    </div>
+    <div class="section-title">Add an employee</div>
+    <div class="card" style="max-width:480px">
+      <div class="grid grid-2">
+        <div class="field"><label>Name</label><input id="staffName" placeholder="Full name"></div>
+        <div class="field"><label>Email</label><input type="email" id="staffEmail" placeholder="name@restaurant.com"></div>
+        <div class="field"><label>Role</label>
+          <select id="staffRole">
+            <option value="waiter">Waiter</option>
+            <option value="chef">Chef</option>
+            <option value="inventory_manager">Inventory Manager</option>
+            <option value="sub_admin">Sub-Admin</option>
+          </select>
+        </div>
+        <div class="field"><label>Branch</label>
+          <select id="staffBranch">${branches.map(b => `<option value="${b.id}" ${b.id===user.branchId?'selected':''}>${b.name}</option>`).join('')}</select>
+        </div>
+      </div>
+      <p class="muted">New accounts use the shared demo password (<code>password</code>) and appear on the sign-in page immediately.</p>
+      <button class="btn btn-primary" onclick="createStaff()">Add employee</button>
+    </div>
+  `;
+  loadStaffList(branches);
+}
+async function loadStaffList(branches) {
+  const lists = await Promise.all(branches.map(b => Api.get(`/staff/${b.id}`).then(list => list.map(s => ({ ...s, branchName: b.name })))));
+  const all = lists.flat();
+  document.getElementById('staffList').innerHTML = all.map(s => `
+    <div class="card">
+      <div class="flex-between"><strong>${s.name}</strong><span class="badge ${s.active ? 'accepted' : 'rejected'}">${s.active ? 'Active' : 'Disabled'}</span></div>
+      <div class="muted">${s.email}</div>
+      <div class="muted">${s.role.replace('_',' ')} · ${s.branchName}</div>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="toggleStaffActive('${s.id}', ${!s.active})">${s.active ? 'Disable' : 'Enable'}</button>
+    </div>`).join('') || '<p class="muted">No staff added yet.</p>';
+}
+async function createStaff() {
+  const name = document.getElementById('staffName').value.trim();
+  const email = document.getElementById('staffEmail').value.trim();
+  const role = document.getElementById('staffRole').value;
+  const branchId = document.getElementById('staffBranch').value;
+  if (!name || !email) return toast('Name and email are required');
+  try {
+    const emp = await Api.post(`/staff/${branchId}`, { name, email, role });
+    toast(`${emp.name} added as ${role.replace('_',' ')} — they can sign in now`);
+    render();
+  } catch (e) { toast(e.message); }
+}
+async function toggleStaffActive(userId, active) {
+  try {
+    await Api.patch(`/staff/${userId}/active`, { active });
+    toast(active ? 'Account enabled' : 'Account disabled');
+    render();
+  } catch (e) { toast(e.message); }
+}
+
+function renderRevenue() {
+  const s = state.summary;
+  if (!s) { document.getElementById('view').innerHTML = '<div class="empty-state">No revenue data yet — complete some orders first.</div>'; return; }
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Revenue</div>
+    <div class="grid grid-4">
+      <div class="card stat-card"><div class="label">Today</div><div class="value">${money(s.revenue.today)}</div></div>
+      <div class="card stat-card"><div class="label">This week</div><div class="value">${money(s.revenue.week)}</div></div>
+      <div class="card stat-card"><div class="label">This month</div><div class="value">${money(s.revenue.month)}</div></div>
+      <div class="card stat-card"><div class="label">This year</div><div class="value">${money(s.revenue.year)}</div></div>
+    </div>
+    <div class="section-title">Orders</div>
+    <div class="grid grid-4">
+      <div class="card stat-card"><div class="label">Completed (all time)</div><div class="value">${s.orderCounts.allTime}</div></div>
+      <div class="card stat-card"><div class="label">Cancelled</div><div class="value">${s.cancelledCount}</div></div>
+      <div class="card stat-card"><div class="label">Rejected (out of stock)</div><div class="value">${s.rejectedCount}</div></div>
+      <div class="card stat-card"><div class="label">Avg. order value</div><div class="value">${money(s.orderCounts.allTime ? s.revenue.allTime / s.orderCounts.allTime : 0)}</div></div>
+    </div>
+    <div class="grid grid-2">
+      <div>
+        <div class="section-title">Top selling items</div>
+        ${s.topItems.map(i => `<div class="cart-line"><span>${i.name}</span><span>${i.qty} sold</span></div>`).join('') || '<p class="muted">No data yet.</p>'}
+      </div>
+      <div>
+        <div class="section-title">Least selling items</div>
+        ${s.leastItems.map(i => `<div class="cart-line"><span>${i.name}</span><span>${i.qty} sold</span></div>`).join('') || '<p class="muted">No data yet.</p>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderMenuMaster() {
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Stock overview</div>
+    <div class="card">
+      <div class="grid grid-3">
+        ${state.menuItems.map(i => `
+          <div class="card" style="padding:14px">
+            <div class="flex-between"><strong>${i.name}</strong><span class="badge ${i.availabilityStatus === 'available' ? 'accepted' : i.availabilityStatus === 'low_stock' ? 'preparing' : 'rejected'}">${statusLabel(i.availabilityStatus || 'available')}</span></div>
+            <div class="muted">${state.categories.find(c=>c.id===i.categoryId)?.name || 'Uncategorized'}</div>
+            <div class="muted">Qty: ${i.availableQuantity ?? 0}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="section-title">Add a new menu item</div>
+    <div class="card" style="max-width:560px">
+      <div class="grid grid-2">
+        <div class="field"><label>Name</label><input id="newItemName" placeholder="e.g. Butter Naan"></div>
+        <div class="field"><label>Price (₹)</label><input type="number" id="newItemPrice" placeholder="0"></div>
+        <div class="field"><label>Category</label>
+          <select id="newItemCategory">${state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Veg?</label><select id="newItemVeg"><option value="true">Veg</option><option value="false">Non-veg</option></select></div>
+        <div class="field"><label>Mode</label>
+          <select id="newItemMode"><option value="both">Dine-in & Take-away</option><option value="dine_in">Dine-in only</option><option value="take_away">Take-away only</option></select>
+        </div>
+        <div class="field"><label>Prep time (min)</label><input type="number" id="newItemPrep" value="15"></div>
+      </div>
+      <div class="field"><label>Description</label><textarea id="newItemDesc" rows="2" placeholder="Short description shown to customers"></textarea></div>
+      <button class="btn btn-primary" onclick="createMenuItem()">Add item — goes live immediately</button>
+    </div>
+
+    <div class="section-title">Menu master (all items, all statuses)</div>
+    <div class="grid grid-3">
+      ${state.menuItems.map(i => `
+        <div class="card">
+          <div class="flex-between"><strong>${i.name}</strong><span class="badge ${i.status==='live'?'accepted':i.status==='pending_approval'?'pending_acceptance':'rejected'}">${statusLabel(i.status)}</span></div>
+          <div class="field" style="margin-top:8px"><label>Price</label>
+            <input type="number" value="${i.price}" onchange="updateMasterItem('${i.id}',{price:Number(this.value)})">
+          </div>
+          <div class="field"><label>Availability</label>
+            <select onchange="updateMasterItem('${i.id}',{mode:this.value})">
+              <option value="both" ${i.mode==='both'?'selected':''}>Dine-in & Take-away</option>
+              <option value="dine_in" ${i.mode==='dine_in'?'selected':''}>Dine-in only</option>
+              <option value="take_away" ${i.mode==='take_away'?'selected':''}>Take-away only</option>
+            </select>
+          </div>
+          <div class="flex" style="margin-top:6px;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="updateMasterItem('${i.id}',{status:'${i.status==='live'?'hidden':'live'}'})">${i.status==='live'?'Hide':'Unhide'}</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteMasterItem('${i.id}','${i.name.replace(/'/g, "\\'")}')">Delete</button>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="section-title">Add new category</div>
+    <div class="card" style="max-width:420px">
+      <div class="field"><label>Category name</label><input id="catName" placeholder="e.g. Sunday Brunch"></div>
+      <button class="btn btn-primary" onclick="createCategory()">Create category</button>
+    </div>
+  `;
+}
+async function createMenuItem() {
+  const name = document.getElementById('newItemName').value.trim();
+  const price = Number(document.getElementById('newItemPrice').value);
+  const categoryId = document.getElementById('newItemCategory').value;
+  if (!name || !price || !categoryId) return toast('Name, price and category are required');
+  try {
+    await Api.post(`/menu/${user.branchId}/items`, {
+      name, price, categoryId,
+      veg: document.getElementById('newItemVeg').value === 'true',
+      mode: document.getElementById('newItemMode').value,
+      prepTime: Number(document.getElementById('newItemPrep').value) || 15,
+      description: document.getElementById('newItemDesc').value
+    });
+    toast('Item added and live on the menu');
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+async function updateMasterItem(id, patch) {
+  try { await Api.patch(`/menu/${user.branchId}/items/${id}`, patch); toast('Menu updated live'); await loadAll(); render(); }
+  catch (e) { toast(e.message); }
+}
+async function deleteMasterItem(id, name) {
+  if (!confirm(`Delete "${name}" from the menu? This can't be undone.`)) return;
+  try { await Api.del(`/menu/${user.branchId}/items/${id}`); toast('Item deleted'); await loadAll(); render(); }
+  catch (e) { toast(e.message); }
+}
+async function createCategory() {
+  const name = document.getElementById('catName').value.trim();
+  if (!name) return toast('Category name is required');
+  try {
+    await Api.post(`/menu/${user.branchId}/categories`, { name });
+    toast('Category created');
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+
+function renderBranches() {
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Branches</div>
+    <div class="grid grid-3">
+      ${(state.branches||[]).map(b => `
+        <div class="card">
+          <strong>${b.name}</strong>
+          <div class="muted">${b.city || ''}</div>
+          <div class="muted">${b.address || ''}</div>
+          <div style="margin-top:8px;font-size:0.85rem">${b.tables} table(s) · ${b.staff} staff</div>
+        </div>`).join('') || '<p class="muted">No branches yet.</p>'}
+    </div>
+    <div class="section-title">Add a branch</div>
+    <div class="card" style="max-width:640px">
+      <div class="grid grid-2">
+        <div class="field"><label>Branch name</label><input id="branchName" placeholder="e.g. Koramangala"></div>
+        <div class="field"><label>City</label><input id="branchCity" placeholder="e.g. Bengaluru"></div>
+        <div class="field"><label>Address</label><input id="branchAddress" placeholder="Street, area"></div>
+        <div class="field"><label>Phone</label><input id="branchPhone" placeholder="+91..."></div>
+        <div class="field"><label>Number of tables to start with</label><input type="number" id="branchTableCount" value="6" min="0" max="30"></div>
+      </div>
+      ${operatingHoursEditor('newBranch', null)}
+      <button class="btn btn-primary" style="margin-top:10px" onclick="createBranch()">Create branch</button>
+      <p class="muted">Add waiters, chefs, and other staff for this branch from the Staff tab once it's created.</p>
+    </div>
+  `;
+}
+async function createBranch() {
+  const name = document.getElementById('branchName').value.trim();
+  if (!name) return toast('Branch name is required');
+  try {
+    const result = await Api.post('/branches', {
+      restaurantId: user.restaurantId,
+      name,
+      city: document.getElementById('branchCity').value,
+      address: document.getElementById('branchAddress').value,
+      phone: document.getElementById('branchPhone').value,
+      tableCount: Number(document.getElementById('branchTableCount').value) || 0,
+      operatingHours: readOperatingHours('newBranch')
+    });
+    toast(`Branch created with ${result.tablesCreated} starter table(s)`);
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+
+function renderCoupons() {
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Coupons & offers</div>
+    <div class="grid grid-3">
+      ${(state.coupons||[]).map(c => `
+        <div class="card" id="coupon-${c.id}">
+          <div class="flex-between"><strong>${c.code}</strong><span class="badge ${c.active?'accepted':'rejected'}">${c.active?'Active':'Inactive'}</span></div>
+          <div class="muted">${c.description || ''}</div>
+          <div style="margin-top:8px">${c.discountType === 'percentage' ? c.discountValue + '% off' : money(c.discountValue) + ' off'} ${c.minOrderValue ? '· min ' + money(c.minOrderValue) : ''}</div>
+          <div class="muted" style="margin-top:4px">Used ${c.usedCount}/${c.maxUses} · valid till ${new Date(c.validTill).toLocaleDateString()}</div>
+          <div class="flex" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="toggleCoupon('${c.id}', ${!c.active})">${c.active ? 'Deactivate' : 'Activate'}</button>
+            <button class="btn btn-outline btn-sm" onclick="openCouponEdit('${c.id}')">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteCoupon('${c.id}')">Delete</button>
+          </div>
+          <div id="couponEdit-${c.id}"></div>
+        </div>`).join('') || '<p class="muted">No coupons yet.</p>'}
+    </div>
+    <div class="section-title">Create a coupon</div>
+    <div class="card" style="max-width:420px">
+      <div class="field"><label>Code</label><input id="cpCode" placeholder="e.g. FESTIVE20"></div>
+      <div class="field"><label>Description</label><input id="cpDesc" placeholder="e.g. Festive season offer"></div>
+      <div class="field"><label>Discount type</label>
+        <select id="cpType"><option value="percentage">Percentage</option><option value="fixed">Flat amount</option></select>
+      </div>
+      <div class="field"><label>Discount value</label><input id="cpValue" type="number" placeholder="e.g. 10"></div>
+      <div class="field"><label>Minimum order value</label><input id="cpMin" type="number" placeholder="0"></div>
+      <button class="btn btn-primary" onclick="createCoupon()">Create coupon</button>
+    </div>
+  `;
+}
+function openCouponEdit(id) {
+  const c = state.coupons.find(x => x.id === id);
+  document.getElementById(`couponEdit-${id}`).innerHTML = `
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+      <div class="field"><label>Description</label><input id="editDesc-${id}" value="${c.description || ''}"></div>
+      <div class="grid grid-2">
+        <div class="field"><label>Discount type</label>
+          <select id="editType-${id}"><option value="percentage" ${c.discountType==='percentage'?'selected':''}>Percentage</option><option value="fixed" ${c.discountType==='fixed'?'selected':''}>Flat amount</option></select>
+        </div>
+        <div class="field"><label>Discount value</label><input type="number" id="editValue-${id}" value="${c.discountValue}"></div>
+        <div class="field"><label>Min order value</label><input type="number" id="editMin-${id}" value="${c.minOrderValue || 0}"></div>
+        <div class="field"><label>Max uses</label><input type="number" id="editMaxUses-${id}" value="${c.maxUses}"></div>
+        <div class="field"><label>Valid till</label><input type="date" id="editValidTill-${id}" value="${new Date(c.validTill).toISOString().slice(0,10)}"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveCouponEdit('${id}')">Save changes</button>
+    </div>
+  `;
+}
+async function saveCouponEdit(id) {
+  try {
+    await Api.patch(`/coupons/admin/${id}`, {
+      description: document.getElementById(`editDesc-${id}`).value,
+      discountType: document.getElementById(`editType-${id}`).value,
+      discountValue: Number(document.getElementById(`editValue-${id}`).value),
+      minOrderValue: Number(document.getElementById(`editMin-${id}`).value) || 0,
+      maxUses: Number(document.getElementById(`editMaxUses-${id}`).value) || 999,
+      validTill: new Date(document.getElementById(`editValidTill-${id}`).value).toISOString()
+    });
+    toast('Coupon updated');
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+async function createCoupon() {
+  const code = document.getElementById('cpCode').value.trim().toUpperCase();
+  const discountValue = Number(document.getElementById('cpValue').value);
+  if (!code || !discountValue) return toast('Code and discount value are required');
+  try {
+    await Api.post('/coupons/admin/create', {
+      code,
+      description: document.getElementById('cpDesc').value,
+      discountType: document.getElementById('cpType').value,
+      discountValue,
+      minOrderValue: Number(document.getElementById('cpMin').value) || 0
+    });
+    toast('Coupon created');
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+async function toggleCoupon(id, active) {
+  try {
+    await Api.patch(`/coupons/admin/${id}`, { active });
+    toast(active ? 'Coupon activated' : 'Coupon deactivated');
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+async function deleteCoupon(id) {
+  if (!confirm('Delete this coupon?')) return;
+  try {
+    await Api.del(`/coupons/admin/${id}`);
+    toast('Coupon deleted');
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+
+function renderPlatform() {
+  const d = state.dashboardData;
+  if (!d) { document.getElementById('view').innerHTML = '<div class="empty-state">Loading...</div>'; return; }
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Platform Analytics</div>
+    <div class="grid grid-4">
+      <div class="card stat-card"><div class="label">Total Restaurants</div><div class="value">${d.totalRestaurants}</div></div>
+      <div class="card stat-card"><div class="label">Total Users</div><div class="value">${d.totalUsers}</div></div>
+      <div class="card stat-card"><div class="label">Total Orders</div><div class="value">${d.totalOrders}</div></div>
+      <div class="card stat-card"><div class="label">Platform Revenue</div><div class="value">${money(d.totalRevenue)}</div></div>
+    </div>
+    <div class="grid grid-2">
+      <div class="card stat-card"><div class="label">Completed Orders</div><div class="value">${d.completedOrders}</div></div>
+      <div class="card stat-card"><div class="label">Avg Order Value</div><div class="value">${money(d.avgOrderValue)}</div></div>
+    </div>
+    <div class="section-title">Revenue by Restaurant</div>
+    <div class="grid grid-3">
+      ${d.restaurantBreakdown.map(r => `
+        <div class="card">
+          <strong>${r.name}</strong>
+          <div class="muted">${r.branches} branch(es) · ${r.orders} orders</div>
+          <div style="margin-top:8px;font-size:1.2rem;font-weight:700">${money(r.revenue)}</div>
+        </div>`).join('')}
+    </div>
+  `;
+}
+
+const DAY_LABELS = { mon:'Mon', tue:'Tue', wed:'Wed', thu:'Thu', fri:'Fri', sat:'Sat', sun:'Sun' };
+function operatingHoursEditor(idPrefix, existing) {
+  const hours = existing || { mon:{open:'10:00',close:'22:00',closed:false}, tue:{open:'10:00',close:'22:00',closed:false},
+    wed:{open:'10:00',close:'22:00',closed:false}, thu:{open:'10:00',close:'22:00',closed:false},
+    fri:{open:'10:00',close:'22:00',closed:false}, sat:{open:'10:00',close:'22:00',closed:false}, sun:{open:'10:00',close:'22:00',closed:false} };
+  return `
+    <div class="field"><label>Opening hours — set per day</label></div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${Object.keys(DAY_LABELS).map(d => `
+        <div class="flex" style="gap:8px;align-items:center">
+          <span style="width:38px;font-size:0.8rem">${DAY_LABELS[d]}</span>
+          <label class="flex" style="gap:4px;font-size:0.78rem;text-transform:none;letter-spacing:0">
+            <input type="checkbox" style="width:auto" id="${idPrefix}-${d}-open" ${!hours[d].closed?'checked':''}> Open
+          </label>
+          <input type="time" id="${idPrefix}-${d}-start" value="${hours[d].open}" style="width:110px">
+          <span class="muted">to</span>
+          <input type="time" id="${idPrefix}-${d}-end" value="${hours[d].close}" style="width:110px">
+          <button type="button" class="btn-outline btn btn-sm" onclick="copyHoursToAll('${idPrefix}','${d}')">Copy to all</button>
+        </div>`).join('')}
+    </div>
+  `;
+}
+function copyHoursToAll(idPrefix, fromDay) {
+  const open = document.getElementById(`${idPrefix}-${fromDay}-open`).checked;
+  const start = document.getElementById(`${idPrefix}-${fromDay}-start`).value;
+  const end = document.getElementById(`${idPrefix}-${fromDay}-end`).value;
+  Object.keys(DAY_LABELS).forEach(d => {
+    document.getElementById(`${idPrefix}-${d}-open`).checked = open;
+    document.getElementById(`${idPrefix}-${d}-start`).value = start;
+    document.getElementById(`${idPrefix}-${d}-end`).value = end;
+  });
+  toast('Copied to every day');
+}
+function readOperatingHours(idPrefix) {
+  const hours = {};
+  Object.keys(DAY_LABELS).forEach(d => {
+    hours[d] = {
+      closed: !document.getElementById(`${idPrefix}-${d}-open`).checked,
+      open: document.getElementById(`${idPrefix}-${d}-start`).value,
+      close: document.getElementById(`${idPrefix}-${d}-end`).value
+    };
+  });
+  return hours;
+}
+
+function renderRestaurants() {
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Add a new restaurant</div>
+    <div class="card" style="max-width:640px">
+      <div class="grid grid-2">
+        <div class="field"><label>Restaurant name</label><input id="newRestName" placeholder="e.g. Spice Route"></div>
+        <div class="field"><label>Restaurant type / cuisine</label><input id="newRestType" placeholder="e.g. North Indian, Cafe, Fine Dining"></div>
+        <div class="field"><label>City</label><input id="newRestCity" placeholder="e.g. Bengaluru"></div>
+        <div class="field"><label>Address</label><input id="newRestAddress" placeholder="Street, area"></div>
+        <div class="field"><label>Phone</label><input id="newRestPhone" placeholder="+91..."></div>
+      </div>
+      <div class="field"><label>Description</label><textarea id="newRestDesc" rows="2" placeholder="Short description for the customer app"></textarea></div>
+      ${operatingHoursEditor('newRest', null)}
+      <div class="section-title" style="margin-top:14px">Restaurant admin account</div>
+      <div class="grid grid-2">
+        <div class="field"><label>Admin name</label><input id="newRestAdminName" placeholder="Owner / manager name"></div>
+        <div class="field"><label>Admin email</label><input type="email" id="newRestAdminEmail" placeholder="owner@restaurant.com"></div>
+      </div>
+      <p class="muted">The new admin login will use the platform's shared demo password (<code>password</code>) and appear on the sign-in page's demo account list immediately.</p>
+      <button class="btn btn-primary" onclick="createRestaurant()">Create restaurant</button>
+    </div>
+
+    <div class="section-title">All Restaurants</div>
+    <div class="grid grid-3">
+      ${state.restaurants.map(r => `
+        <div class="card">
+          <div class="flex-between"><strong>${r.name}</strong><span class="badge ${r.status==='active'?'accepted':r.status==='suspended'?'rejected':'pending_acceptance'}">${statusLabel(r.status)}</span></div>
+          <div class="muted">${r.cuisine || r.type || ''} · ${r.branchCount} branch(es) · ${r.admins} admin(s)</div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
+            <div class="muted">Orders: ${r.orders} · Revenue: ${money(r.revenue)}</div>
+            <div style="margin-top:8px;display:flex;gap:6px">
+              ${r.status !== 'suspended' ? `<button class="btn btn-danger btn-sm" onclick="suspendRestaurant('${r.id}')">Suspend</button>` : `<button class="btn btn-primary btn-sm" onclick="activateRestaurant('${r.id}')">Activate</button>`}
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>
+  `;
+}
+async function createRestaurant() {
+  const name = document.getElementById('newRestName').value.trim();
+  const adminName = document.getElementById('newRestAdminName').value.trim();
+  const adminEmail = document.getElementById('newRestAdminEmail').value.trim();
+  if (!name || !adminName || !adminEmail) return toast('Restaurant name, admin name, and admin email are required');
+  try {
+    const result = await Api.post('/superadmin/restaurants', {
+      name,
+      type: document.getElementById('newRestType').value,
+      city: document.getElementById('newRestCity').value,
+      address: document.getElementById('newRestAddress').value,
+      phone: document.getElementById('newRestPhone').value,
+      description: document.getElementById('newRestDesc').value,
+      operatingHours: readOperatingHours('newRest'),
+      adminName, adminEmail
+    });
+    toast(`${result.restaurant.name} created — ${result.admin.email} can now sign in`);
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+
+function renderRestaurantRequests() {
+  const pending = state.restaurantRequests.filter(r => r.status === 'pending');
+  const decided = state.restaurantRequests.filter(r => r.status !== 'pending');
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Pending self-registrations</div>
+    ${pending.length === 0 ? '<div class="empty-state">No pending requests.</div>' : `
+    <div class="grid grid-3">
+      ${pending.map(r => `
+        <div class="card">
+          <strong>${r.name}</strong>
+          <div class="muted">${r.type || r.cuisine || ''} ${r.city ? '· ' + r.city : ''}</div>
+          <div class="muted" style="margin-top:6px">${r.description || ''}</div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
+            <div class="muted">Requested by ${r.adminName} · ${r.adminEmail}</div>
+            <div class="muted">Submitted ${timeAgo(r.submittedAt)}</div>
+          </div>
+          <div class="flex" style="margin-top:10px;gap:6px">
+            <button class="btn btn-primary btn-sm" onclick="approveRequest('${r.id}')">Approve</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectRequest('${r.id}')">Reject</button>
+          </div>
+        </div>`).join('')}
+    </div>`}
+
+    <div class="section-title">Past decisions</div>
+    ${decided.length === 0 ? '<p class="muted">None yet.</p>' : `
+    <div class="grid grid-3">
+      ${decided.map(r => `
+        <div class="card">
+          <div class="flex-between"><strong>${r.name}</strong><span class="badge ${r.status==='approved'?'accepted':'rejected'}">${statusLabel(r.status)}</span></div>
+          <div class="muted">${r.adminEmail}</div>
+          ${r.rejectionReason ? `<div class="muted" style="margin-top:6px">Reason: ${r.rejectionReason}</div>` : ''}
+        </div>`).join('')}
+    </div>`}
+  `;
+}
+async function approveRequest(id) {
+  try {
+    const result = await Api.patch(`/superadmin/restaurant-requests/${id}/approve`);
+    toast(`Approved — ${result.admin.email} can now sign in`);
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+async function rejectRequest(id) {
+  const reason = prompt('Reason for rejecting this request (optional):') || '';
+  try {
+    await Api.patch(`/superadmin/restaurant-requests/${id}/reject`, { reason });
+    toast('Request rejected');
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+
+async function suspendRestaurant(id) {
+  if (confirm('Suspend this restaurant?')) {
+    try {
+      await Api.patch('/superadmin/restaurants/' + id + '/status', { status: 'suspended' });
+      toast('Restaurant suspended');
+      await loadAll();
+      render();
+    } catch (e) { toast(e.message); }
+  }
+}
+
+async function activateRestaurant(id) {
+  if (confirm('Activate this restaurant?')) {
+    try {
+      await Api.patch('/superadmin/restaurants/' + id + '/status', { status: 'active' });
+      toast('Restaurant activated');
+      await loadAll();
+      render();
+    } catch (e) { toast(e.message); }
+  }
+}
+
+function renderUsers() {
+  const branches = state.branches && state.branches.length ? state.branches : [{ id: user.branchId, name: 'Main Branch' }];
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Platform Users</div>
+    <div class="card" style="max-width:760px">
+      <div class="grid grid-3">
+        <div class="field"><label>Name</label><input id="newUserName" placeholder="Full name"></div>
+        <div class="field"><label>Email</label><input type="email" id="newUserEmail" placeholder="name@demo.com"></div>
+        <div class="field"><label>Role</label>
+          <select id="newUserRole">
+            <option value="sub_admin">Sub-Admin</option>
+            <option value="waiter">Waiter</option>
+            <option value="inventory_manager">Inventory Manager</option>
+          </select>
+        </div>
+        <div class="field"><label>Branch</label>
+          <select id="newUserBranch">${branches.map(b => `<option value="${b.id}" ${b.id===user.branchId?'selected':''}>${b.name}${b.restaurantName ? ' (' + b.restaurantName + ')' : ''}</option>`).join('')}</select>
+        </div>
+      </div>
+      <p class="muted">New accounts use the shared demo password (<code>password</code>) and are added to the sign-in demo list immediately.</p>
+      <button class="btn btn-primary" onclick="createPlatformUser()">Create account</button>
+    </div>
+
+    <div style="overflow-x:auto; margin-top:20px">
+      <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+        <thead style="background:var(--cream-dim)">
+          <tr><th style="padding:10px;text-align:left">Name</th><th style="padding:10px;text-align:left">Email</th><th style="padding:10px;text-align:left">Role</th><th style="padding:10px;text-align:left">Status</th><th style="padding:10px">Actions</th></tr>
+        </thead>
+        <tbody>
+          ${state.users.map(u => `
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:10px">${u.name}</td>
+              <td style="padding:10px">${u.email}</td>
+              <td style="padding:10px"><span class="badge">${u.role.replace(/_/g,' ')}</span></td>
+              <td style="padding:10px"><span class="badge ${u.suspended?'rejected':'accepted'}">${u.suspended?'Suspended':'Active'}</span></td>
+              <td style="padding:10px;text-align:center">
+                ${u.suspended ? `<button class="btn btn-sm btn-primary" onclick="unsuspendUser('${u.id}')">Unsuspend</button>` : `<button class="btn btn-sm btn-danger" onclick="suspendUser('${u.id}')">Suspend</button>`}
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function createPlatformUser() {
+  const name = document.getElementById('newUserName').value.trim();
+  const email = document.getElementById('newUserEmail').value.trim();
+  const role = document.getElementById('newUserRole').value;
+  const branchId = document.getElementById('newUserBranch').value;
+  if (!name || !email) return toast('Name and email are required');
+  try {
+    await Api.post(`/staff/${branchId}`, { name, email, role });
+    toast(`${name} has been added as a ${role.replace(/_/g,' ')}. The account will appear in demo login immediately.`);
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+
+async function suspendUser(id) {
+  if (confirm('Suspend this user?')) {
+    try {
+      await Api.patch('/superadmin/users/' + id + '/suspend', {});
+      toast('User suspended');
+      await loadAll();
+      render();
+    } catch (e) { toast(e.message); }
+  }
+}
+
+async function unsuspendUser(id) {
+  if (confirm('Reactivate this user?')) {
+    try {
+      await Api.patch('/superadmin/users/' + id + '/unsuspend', {});
+      toast('User reactivated');
+      await loadAll();
+      render();
+    } catch (e) { toast(e.message); }
+  }
+}
+
+function renderPayments() {
+  const p = state.payments;
+  if (!p) { document.getElementById('view').innerHTML = '<div class="empty-state">Loading...</div>'; return; }
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Payment Analytics</div>
+    <div class="grid grid-3">
+      <div class="card stat-card"><div class="label">Total Payments</div><div class="value">${p.totalPayments}</div></div>
+      <div class="card stat-card"><div class="label">Total Amount</div><div class="value">${money(p.totalAmount)}</div></div>
+      <div class="card stat-card"><div class="label">Success Rate</div><div class="value">${(p.successRate * 100).toFixed(0)}%</div></div>
+    </div>
+    <div class="section-title">By Payment Method</div>
+    <div class="grid grid-3">
+      ${Object.entries(p.byMethod).map(([method, amount]) => `
+        <div class="card"><strong>${method.toUpperCase()}</strong><div style="margin-top:8px;font-size:1.3rem;font-weight:700">${money(amount)}</div></div>`).join('')}
+    </div>
+  `;
+}
+
+init();
+</script>
+</body>
+</html>

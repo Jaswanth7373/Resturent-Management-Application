@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Copper Fork — Order</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .hero { background: linear-gradient(120deg, var(--forest-deep), var(--forest)); color: var(--cream); padding: 30px 24px; }
+  .hero .shell { padding: 0; }
+  .restaurant-card { cursor: pointer; }
+  .restaurant-card .tagrow { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .tag {background: #C89B3C; color: #fff; border-radius: 999px; padding: 3px 10px; font-size: 0.72rem; }
+  .cat-nav { display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; margin-bottom: 6px; }
+  .cat-nav button { white-space:nowrap; }
+  .item-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 16px; }
+  .qty-stepper { display:flex; align-items:center; gap:8px; }
+  .qty-stepper button { width:28px; height:28px; border-radius:50%; border:1px solid var(--line); background:var(--white); }
+  .cart-drawer { position: sticky; top: 78px; }
+  .cart-line { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:0.88rem; }
+  .price-row { display:flex; justify-content:space-between; font-size:0.85rem; padding:3px 0; }
+  .price-row.total { font-weight:700; font-size:1rem; border-top:1px solid var(--line); margin-top:6px; padding-top:8px; }
+  .mode-toggle { display:flex; gap:8px; margin-bottom: 12px; }
+  .mode-toggle button { flex:1; }
+  .progress-track { display:flex; gap:4px; margin: 10px 0; }
+  .progress-step { flex:1; height:6px; border-radius:3px; background: var(--line); }
+  .progress-step.done { background: var(--forest); }
+</style>
+</head>
+<body>
+<div id="topbarRoot"></div>
+<div class="hero" id="heroRoot"></div>
+<div class="shell">
+  <div class="tabs" id="tabNav"></div>
+  <div id="view"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+let state = {
+  branchId: null,
+  restaurant: null,
+  allRestaurants: [],   // every active restaurant on the platform, for the discovery picker
+  pickerSearch: '',
+  pickerVegOnly: false,
+  categories: [],
+  items: [],
+  cart: [],           // { menuItemId, name, price, qty }
+  mode: 'dine_in',
+  tableId: null,
+  qrTable: null,       // preset table from "scanned" QR
+  scheduledFor: '',
+  couponCode: '',
+  appliedCoupon: null,
+  activeTab: 'discover',
+  search: '',
+  vegOnly: false,
+  activeCat: 'all',
+  myOrders: JSON.parse(localStorage.getItem('rp_myorders') || '[]'),
+  favorites: [],
+  myReviews: [],
+  socket: null,
+};
+
+const isGuest = !Auth.token() || (Auth.user() && Auth.user().role !== 'customer');
+
+window.__getAssistantLiveData = async function() {
+  const branchId = state.branchId || null;
+  const restaurantName = state.restaurant ? state.restaurant.name : 'your selected restaurant';
+  const popularItems = branchId ? await Api.get(`/analytics/items/${branchId}`).catch(() => []).then(list => list.slice(0, 3).filter(item => item.totalQtySold > 0)) : [];
+  return {
+    kind: 'customer',
+    branchId,
+    restaurantName,
+    popularItems: popularItems.map(item => ({ name: item.name, qty: item.totalQtySold })),
+    favoritesCount: state.favorites.length,
+    reviewCount: state.myReviews.length,
+    cartCount: state.cart.reduce((sum, item) => sum + item.qty, 0)
+  };
+};
+
+document.getElementById('topbarRoot').innerHTML = renderTopbarGuestAware();
+function renderTopbarGuestAware() {
+  if (isGuest) {
+    return `<div class="topbar"><div class="brand"><span class="dot"></span> The Copper Fork <span class="role-pill">Guest</span></div>
+      <div class="actions"><a href="/index.html" class="btn-ghost" style="text-decoration:none">Sign in</a></div></div>`;
+  }
+  return renderTopbar('Customer');
+}
+
+async function init() {
+  const restaurants = await Api.get('/restaurants');
+  // Only restaurants the Super Admin has approved & activated are visible to customers —
+  // pending/suspended ones exist in the platform but aren't live yet.
+  state.allRestaurants = restaurants.filter(r => (r.status || 'active') === 'active' && r.branches && r.branches.length);
+
+  const directBranchId = params.get('branch');
+  const qrTableNum = params.get('table');
+
+  if (directBranchId) {
+    const match = state.allRestaurants.find(r => r.branches.some(b => b.id === directBranchId));
+    if (match) {
+      await selectRestaurant(match, match.branches.find(b => b.id === directBranchId), qrTableNum);
+      return;
+    }
+  }
+  // Legacy fallback: a bare ?table= with no ?branch= (old single-restaurant QR codes)
+  if (qrTableNum && !directBranchId && state.allRestaurants.length) {
+    await selectRestaurant(state.allRestaurants[0], state.allRestaurants[0].branches[0], qrTableNum);
+    return;
+  }
+  showPicker();
+}
+
+function showPicker() {
+  state.restaurant = null;
+  state.branchId = null;
+  document.getElementById('tabNav').innerHTML = '';
+  document.getElementById('heroRoot').innerHTML = `
+    <div class="shell">
+      <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;opacity:0.8">Dine-in & take-away platform</div>
+      <h1 class="display" style="margin:6px 0 4px;font-size:2.1rem">Where would you like to eat?</h1>
+      <div class="muted" style="opacity:0.9">Pick a restaurant to see its menu, book a table, or order take-away.</div>
+    </div>`;
+  renderPicker();
+}
+
+function renderPicker() {
+  let list = state.allRestaurants;
+  if (state.pickerVegOnly) list = list.filter(r => (r.tags || []).some(t => /veg/i.test(t)) || r.vegOnly);
+  if (state.pickerSearch) {
+    const q = state.pickerSearch.toLowerCase();
+    list = list.filter(r => r.name.toLowerCase().includes(q) || (r.cuisine || '').toLowerCase().includes(q) || (r.type || '').toLowerCase().includes(q));
+  }
+  document.getElementById('view').innerHTML = `
+    <div class="flex-between" style="margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <input placeholder="Search restaurants or cuisine…" style="max-width:280px" value="${state.pickerSearch}" oninput="state.pickerSearch=this.value;renderPicker()">
+      <label class="flex" style="gap:6px;font-size:0.85rem;text-transform:none;letter-spacing:0"><input type="checkbox" style="width:auto" ${state.pickerVegOnly?'checked':''} onchange="state.pickerVegOnly=this.checked;renderPicker()"> Veg-friendly</label>
+    </div>
+    <div class="grid grid-3">
+      ${list.map(r => `
+        <div class="card restaurant-card" onclick="chooseFromPicker('${r.id}')">
+          <h3 style="margin:0 0 4px">${r.name}</h3>
+          <div class="muted">${r.cuisine || r.type || ''} ${r.priceRange ? '· ' + r.priceRange : ''}</div>
+          <div class="tagrow">${(r.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+          <div style="margin-top:10px" class="muted">${r.rating ? '★ ' + r.rating + ' · ' : ''}${r.branches.length} location${r.branches.length>1?'s':''}</div>
+        </div>`).join('') || '<div class="empty-state">No restaurants match your search.</div>'}
+    </div>
+  `;
+}
+function chooseFromPicker(restaurantId) {
+  const r = state.allRestaurants.find(x => x.id === restaurantId);
+  if (r) selectRestaurant(r, r.branches[0]);
+}
+
+async function selectRestaurant(restaurant, branch, qrTableNum) {
+  state.restaurant = restaurant;
+  state.branchId = branch.id;
+  state.cart = []; state.tableId = null; state.qrTable = null; state.appliedCoupon = null; state.couponCode = '';
+
+  document.getElementById('heroRoot').innerHTML = `
+    <div class="shell">
+      <a href="#" onclick="showPicker();return false;" class="muted" style="font-size:0.78rem;text-decoration:underline">← All restaurants</a>
+      <h1 class="display" style="margin:6px 0 4px;font-size:2.1rem">${restaurant.name}</h1>
+      <div class="flex" style="opacity:0.9;font-size:0.9rem;flex-wrap:wrap">
+        <span>★ ${restaurant.rating ?? '—'}</span><span>·</span><span>${restaurant.cuisine || restaurant.type || ''}</span>
+        <span>·</span><span>${restaurant.priceRange || '₹₹'}</span>
+        <span>·</span><span>${restaurant.isOpen === false ? 'Closed' : 'Open now'}</span>
+      </div>
+      <div class="tagrow" style="margin-top:10px">${(restaurant.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+    </div>`;
+
+  if (state.socket) state.socket.disconnect();
+  state.socket = connectSocket(state.branchId);
+  state.socket.on('order:updated', (o) => { if (state.myOrders.includes(o.id)) renderTrackTab(); });
+  state.socket.on('table:updated', () => { if (state.activeTab === 'cart') renderCartTab(); });
+  state.socket.on('menu:updated', async () => { await loadMenu(); if (state.activeTab === 'menu') renderMenuTab(); });
+
+  await loadMenu();
+  if (!isGuest) {
+    await loadFavorites();
+    await loadReviews();
+  }
+
+  if (qrTableNum) {
+    const tables = await Api.get('/tables/' + state.branchId);
+    const t = tables.find(t => String(t.number) === String(qrTableNum));
+    if (t) { state.qrTable = t; state.tableId = t.id; state.mode = 'dine_in'; toast(`Table ${t.number} linked via QR scan`); }
+  }
+
+  setTab(qrTableNum ? 'menu' : 'discover');
+}
+
+async function loadMenu() {
+  const res = await Api.get(`/menu/${state.branchId}?visibleOnly=true`);
+  state.categories = res.categories;
+  state.items = res.items;
+}
+
+function setTab(tab) {
+  state.activeTab = tab;
+  const tabs = [
+    { id: 'discover', label: 'Discover' },
+    { id: 'menu', label: 'Menu' },
+    { id: 'cart', label: `Cart (${state.cart.reduce((s,i)=>s+i.qty,0)})` },
+    { id: 'reserve', label: 'Reserve a Table' },
+    { id: 'favorites', label: 'Favorites' },
+    { id: 'track', label: 'My Orders' },
+  ];
+  if (!isGuest) tabs.push({ id: 'reviews', label: 'My Reviews' });
+  document.getElementById('tabNav').innerHTML = tabs.map(t =>
+    `<button class="tab ${state.activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`
+  ).join('');
+  ({ discover: renderDiscoverTab, menu: renderMenuTab, cart: renderCartTab, reserve: renderReserveTab, favorites: renderFavoritesTab, track: renderTrackTab, reviews: renderReviewsTab })[tab]();
+}
+
+function renderDiscoverTab() {
+  const others = state.allRestaurants.filter(r => r.id !== state.restaurant.id);
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">This restaurant</div>
+    <div class="grid grid-3">
+      <div class="card restaurant-card" onclick="setTab('menu')">
+        <h3 style="margin:0 0 4px">${state.restaurant.name}</h3>
+        <div class="muted">${state.restaurant.cuisine || state.restaurant.type || ''} · ${state.restaurant.priceRange || '₹₹'}</div>
+        <div class="tagrow">${(state.restaurant.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+        <div style="margin-top:10px" class="muted">★ ${state.restaurant.rating ?? '—'} · ${state.restaurant.isOpen === false ? 'Closed' : 'Open now'}</div>
+      </div>
+    </div>
+    <div class="section-title">Similar restaurants</div>
+    <div class="grid grid-3">
+      ${others.length ? others.map(r => `
+        <div class="card restaurant-card" onclick="chooseFromPicker('${r.id}')">
+          <h3 style="margin:0 0 4px">${r.name}</h3>
+          <div class="muted">${r.cuisine || r.type || ''} · ${r.priceRange || '₹₹'}</div>
+          <div class="tagrow">${(r.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+          <div style="margin-top:10px" class="muted">${r.rating ? '★ ' + r.rating : ''}</div>
+        </div>`).join('') : '<div class="empty-state">No other restaurants on the platform yet.</div>'}
+    </div>
+  `;
+}
+
+function renderMenuTab() {
+  const cats = ['all', ...state.categories.map(c => c.name)];
+  let filtered = state.items;
+  if (state.vegOnly) filtered = filtered.filter(i => i.veg);
+  if (state.activeCat !== 'all') filtered = filtered.filter(i => (state.categories.find(c=>c.name===state.activeCat)||{}).id === i.categoryId);
+  if (state.search) filtered = filtered.filter(i => i.name.toLowerCase().includes(state.search.toLowerCase()));
+
+  document.getElementById('view').innerHTML = `
+    ${state.qrTable ? `<div class="card" style="background:var(--brass-soft);border:none;margin-bottom:14px">📍 Ordering for <strong>Table ${state.qrTable.number}</strong> — scanned via QR, no login needed.</div>` : ''}
+    <div class="flex-between" style="margin-bottom:10px;flex-wrap:wrap;gap:10px">
+      <input placeholder="Search the menu…" style="max-width:260px" value="${state.search}" oninput="state.search=this.value;renderMenuTab()">
+      <label class="flex" style="gap:6px;font-size:0.85rem;text-transform:none;letter-spacing:0"><input type="checkbox" style="width:auto" ${state.vegOnly?'checked':''} onchange="state.vegOnly=this.checked;renderMenuTab()"> Veg only</label>
+    </div>
+    <div class="cat-nav">${cats.map(c => `<button class="tab ${state.activeCat===c?'active':''}" onclick="state.activeCat='${c}';renderMenuTab()">${c==='all'?'All':c}</button>`).join('')}</div>
+    <div class="item-grid">
+      ${filtered.length ? filtered.map(renderItemCard).join('') : '<div class="empty-state">No items match your filters.</div>'}
+    </div>
+  `;
+}
+
+function renderItemCard(i) {
+  const inCart = state.cart.find(c => c.menuItemId === i.id);
+  const qty = inCart ? inCart.qty : 0;
+  const availability = i.availabilityStatus || 'available';
+  const isOut = availability === 'out_of_stock';
+  const isLow = availability === 'low_stock';
+  return `
+    <div class="item-card ${isOut ? 'urgent' : ''}" style="${isOut ? 'opacity:0.8' : ''}">
+      <div class="flex-between">
+        <span class="${i.veg ? 'veg-dot' : 'nonveg-dot'}"></span>
+        <span class="muted">${i.prepTime} min</span>
+      </div>
+      <h3 style="margin:0;font-size:1.05rem">${i.name}</h3>
+      <div class="muted" style="min-height:32px">${i.description}</div>
+      <div class="flex-between">
+        <strong>${money(i.price)}</strong>
+        <span class="muted">★ ${i.rating || '—'}</span>
+      </div>
+      <div class="tagrow">
+        ${i.seasonal ? '<span class="tag">🍂 Seasonal</span>' : ''}
+        <span class="badge ${availability === 'available' ? 'accepted' : availability === 'low_stock' ? 'preparing' : 'rejected'}">${availability === 'available' ? 'Available' : availability === 'low_stock' ? 'Low Stock' : 'Out of Stock'}</span>
+        ${isLow ? '<span class="tag">Only few portions left</span>' : ''}
+      </div>
+      <div class="flex-between">
+        <span class="badge accepted" style="text-transform:capitalize">${i.mode.replace('_',' ')}</span>
+        ${isOut
+          ? '<button class="btn btn-danger btn-sm" disabled>OUT OF STOCK</button>'
+          : qty === 0
+            ? `<button class="btn btn-primary btn-sm" onclick="addToCart('${i.id}')">Add to cart</button>`
+            : `<div class="qty-stepper"><button onclick="changeQty('${i.id}',-1)">−</button><span>${qty}</span><button onclick="changeQty('${i.id}',1)">+</button></div>`}
+      </div>
+      ${isOut ? '<div class="muted" style="color:var(--rust);font-weight:600">Out of stock — cannot be ordered</div>' : ''}
+    </div>
+  `;
+}
+
+function addToCart(itemId) {
+  const item = state.items.find(i => i.id === itemId);
+  if ((item.availabilityStatus || 'available') === 'out_of_stock') return toast('This item is out of stock');
+  state.cart.push({ menuItemId: item.id, name: item.name, price: item.price, qty: 1 });
+  state.appliedCoupon = null;
+  renderMenuTab(); setTab(state.activeTab === 'cart' ? 'cart' : state.activeTab);
+  toast(`${item.name} added to cart`);
+}
+function changeQty(itemId, delta) {
+  const line = state.cart.find(c => c.menuItemId === itemId);
+  if (!line) return;
+  line.qty += delta;
+  if (line.qty <= 0) state.cart = state.cart.filter(c => c.menuItemId !== itemId);
+  state.appliedCoupon = null;
+  renderMenuTab();
+}
+
+function cartTotals() {
+  const subtotal = state.cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const discount = state.appliedCoupon ? Math.min(state.appliedCoupon.discount, subtotal) : 0;
+  const tax = Math.round((subtotal - discount) * 0.05);
+  const packing = state.mode === 'take_away' ? 20 : 0;
+  return { subtotal, discount, tax, packing, total: subtotal - discount + tax + packing };
+}
+async function applyCoupon() {
+  const code = document.getElementById('couponInput').value.trim().toUpperCase();
+  if (!code) { state.appliedCoupon = null; renderCartTab(); return; }
+  try {
+    const result = await Api.post('/coupons/validate', {
+      code, orderValue: cartTotals().subtotal, restaurantId: state.restaurant.id
+    });
+    state.couponCode = code;
+    state.appliedCoupon = result;
+    toast(`Coupon applied — you saved ${money(result.discount)}`);
+    renderCartTab();
+  } catch (e) {
+    state.appliedCoupon = null;
+    toast(e.message);
+  }
+}
+
+async function renderCartTab() {
+  const t = cartTotals();
+  let tablesHtml = '';
+  if (state.mode === 'dine_in' && !state.qrTable) {
+    const tables = await Api.get('/tables/' + state.branchId);
+    tablesHtml = `
+      <div class="field">
+        <label>Choose a table (or auto-assign)</label>
+        <div class="grid grid-4" style="gap:8px">
+          ${tables.map(tb => `
+            <div class="table-tile ${tb.status}" style="aspect-ratio:auto;padding:10px;${state.tableId===tb.id?'outline:2px solid var(--brass)':''}"
+                 onclick="${tb.status==='available' ? `state.tableId='${tb.id}';renderCartTab()` : ''}">
+              <div class="tnum">${tb.number}</div>
+              <div class="tstatus">${tb.status}</div>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="state.tableId=null;renderCartTab()">Clear selection (auto-assign at checkout)</button>
+      </div>`;
+  } else if (state.qrTable) {
+    tablesHtml = `<div class="card" style="background:var(--brass-soft);border:none">Linked to Table ${state.qrTable.number} via QR scan.</div>`;
+  }
+
+  document.getElementById('view').innerHTML = `
+    <div class="grid grid-2">
+      <div>
+        <div class="section-title">Your cart</div>
+        ${state.cart.length === 0 ? '<div class="empty-state">Your cart is empty — add items from the Menu tab.</div>' :
+          state.cart.map(c => `
+            <div class="cart-line">
+              <span>${c.name}</span>
+              <div class="qty-stepper"><button onclick="changeQty('${c.menuItemId}',-1)">−</button><span>${c.qty}</span><button onclick="changeQty('${c.menuItemId}',1)">+</button></div>
+              <span>${money(c.price * c.qty)}</span>
+            </div>`).join('')}
+
+        <div class="section-title">Dining mode</div>
+        <div class="mode-toggle">
+          <button class="btn ${state.mode==='dine_in'?'btn-primary':'btn-outline'}" onclick="state.mode='dine_in';renderCartTab()">Dine-in</button>
+          <button class="btn ${state.mode==='take_away'?'btn-primary':'btn-outline'}" onclick="state.mode='take_away';renderCartTab()">Take-away</button>
+        </div>
+        ${state.mode === 'dine_in' ? tablesHtml : `
+          <div class="field">
+            <label>Pickup time</label>
+            <select onchange="state.scheduledFor=this.value">
+              <option value="">As soon as possible</option>
+              <option value="schedule">Schedule for later</option>
+            </select>
+            <div id="scheduleField"></div>
+          </div>
+        `}
+      </div>
+
+      <div class="cart-drawer card">
+        <h3 style="margin-top:0">Order summary</h3>
+        <div class="field">
+          <label>Customer name</label>
+          <input id="custName" placeholder="Your name" value="${isGuest ? '' : (Auth.user()?.name || '')}">
+        </div>
+        <div class="field">
+          <label>Coupon code</label>
+          <div class="flex">
+            <input id="couponInput" placeholder="Enter a coupon code" value="${state.couponCode}">
+            <button type="button" class="btn btn-outline btn-sm" onclick="applyCoupon()">Apply</button>
+          </div>
+          ${state.appliedCoupon ? `<div class="muted" style="margin-top:4px;color:var(--forest)">✓ ${state.appliedCoupon.code} — ${state.appliedCoupon.description || 'discount applied'}</div>` : ''}
+        </div>
+        <div class="field">
+          <label>Special instructions</label>
+          <textarea id="notesInput" rows="2" placeholder="Allergies, spice level, etc."></textarea>
+        </div>
+        <div class="price-row"><span>Subtotal</span><span>${money(t.subtotal)}</span></div>
+        <div class="price-row"><span>Discount</span><span>−${money(t.discount)}</span></div>
+        <div class="price-row"><span>Tax (5%)</span><span>${money(t.tax)}</span></div>
+        ${state.mode==='take_away' ? `<div class="price-row"><span>Packing charge</span><span>${money(t.packing)}</span></div>` : ''}
+        <div class="price-row total"><span>Total</span><span>${money(t.total)}</span></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px" ${state.cart.length===0?'disabled':''} onclick="placeOrder()">Place order</button>
+      </div>
+    </div>
+  `;
+
+  const scheduleSelect = document.querySelector('#view select');
+  if (scheduleSelect) {
+    scheduleSelect.addEventListener('change', (e) => {
+      const field = document.getElementById('scheduleField');
+      if (e.target.value === 'schedule') {
+        field.innerHTML = `<input type="datetime-local" id="scheduleTime" style="margin-top:8px">`;
+      } else field.innerHTML = '';
+    });
+  }
+}
+
+async function placeOrder() {
+  const customerName = document.getElementById('custName').value || 'Guest';
+  const notes = document.getElementById('notesInput').value;
+  let scheduledFor = null;
+  const scheduleTimeEl = document.getElementById('scheduleTime');
+  if (state.mode === 'take_away' && scheduleTimeEl && scheduleTimeEl.value) scheduledFor = scheduleTimeEl.value;
+
+  try {
+    if (!state.branchId) throw new Error('Branch not selected');
+    if (!state.cart || state.cart.length === 0) throw new Error('Cart is empty');
+    
+    const order = await Api.post(`/orders/${state.branchId}`, {
+      mode: state.mode,
+      items: state.cart.map(c => ({ menuItemId: c.menuItemId, qty: c.qty })),
+      tableId: state.tableId,
+      autoAssignTable: state.mode === 'dine_in' && !state.tableId,
+      scheduledFor, customerName, notes, couponCode: state.couponCode
+    });
+    
+    state.cart = [];
+    state.appliedCoupon = null;
+    state.couponCode = '';
+    state.myOrders.push(order.id);
+    localStorage.setItem('rp_myorders', JSON.stringify(state.myOrders));
+    toast(`Order ${order.orderNumber} placed!`);
+    setTab('track');
+  } catch (e) { 
+    toast('Could not place order: ' + e.message); 
+  }
+}
+
+let reservePreorder = [];
+async function renderReserveTab() {
+  reservePreorder = [];
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Reserve a table</div>
+    <div class="card" style="max-width:520px">
+      <div class="grid grid-2">
+        <div class="field"><label>Name</label><input id="rName"></div>
+        <div class="field"><label>Phone</label><input id="rPhone"></div>
+        <div class="field"><label>Date</label><input type="date" id="rDate"></div>
+        <div class="field"><label>Time</label><input type="time" id="rTime"></div>
+        <div class="field"><label>Guests</label><input type="number" min="1" value="2" id="rGuests"></div>
+        <div class="field"><label>Occasion</label>
+          <select id="rOccasion"><option value="">None</option><option>Birthday</option><option>Anniversary</option><option>Meeting</option></select>
+        </div>
+      </div>
+      <div class="field"><label>Special instructions</label><textarea id="rNotes" rows="2" placeholder="Allergies, seating preference, anything else we should know"></textarea></div>
+
+      <div class="section-title" style="margin-top:14px">Pre-order food (optional)</div>
+      <div class="flex">
+        <select id="rPreItem">${state.items.map(i => `<option value="${i.id}">${i.name} — ${money(i.price)}</option>`).join('')}</select>
+        <input type="number" id="rPreQty" value="1" min="1" style="width:70px">
+        <button class="btn btn-outline btn-sm" onclick="addReservePreorderItem()">Add</button>
+      </div>
+      <div id="rPreorderList" style="margin-top:8px"></div>
+
+      <button class="btn btn-primary" style="margin-top:14px" onclick="submitReservation()">Reserve table</button>
+    </div>
+    <div id="reserveConfirm"></div>
+  `;
+}
+function addReservePreorderItem() {
+  const id = document.getElementById('rPreItem').value;
+  const qty = Number(document.getElementById('rPreQty').value);
+  const item = state.items.find(i => i.id === id);
+  if (!item || !qty) return;
+  reservePreorder.push({ menuItemId: id, name: item.name, price: item.price, qty });
+  document.getElementById('rPreorderList').innerHTML = reservePreorder.map((l, idx) =>
+    `<div class="cart-line"><span>${l.qty}× ${l.name}</span><span>${money(l.price*l.qty)} <button class="btn-ghost" style="color:var(--rust)" onclick="removeReservePreorderItem(${idx})">✕</button></span></div>`
+  ).join('');
+}
+function removeReservePreorderItem(idx) {
+  reservePreorder.splice(idx, 1);
+  document.getElementById('rPreorderList').innerHTML = reservePreorder.map((l, i) =>
+    `<div class="cart-line"><span>${l.qty}× ${l.name}</span><span>${money(l.price*l.qty)} <button class="btn-ghost" style="color:var(--rust)" onclick="removeReservePreorderItem(${i})">✕</button></span></div>`
+  ).join('');
+}
+async function submitReservation() {
+  try {
+    const r = await Api.post(`/reservations/${state.branchId}`, {
+      customerName: document.getElementById('rName').value,
+      phone: document.getElementById('rPhone').value,
+      date: document.getElementById('rDate').value,
+      time: document.getElementById('rTime').value,
+      guests: Number(document.getElementById('rGuests').value),
+      occasion: document.getElementById('rOccasion').value || null,
+      notes: document.getElementById('rNotes').value || '',
+      preorderItems: reservePreorder,
+    });
+    document.getElementById('reserveConfirm').innerHTML = `<div class="card" style="margin-top:12px;background:var(--brass-soft);border:none">Reserved! We'll see you ${r.date} at ${r.time} for ${r.guests} guests.${reservePreorder.length ? ' Your pre-ordered food will be waiting.' : ''}</div>`;
+    toast('Reservation confirmed');
+  } catch (e) { toast('Reservation failed: ' + e.message); }
+}
+
+const STEPS_DINE_IN = ['pending_acceptance','accepted','preparing','ready','served','completed'];
+const STEPS_TAKE_AWAY = ['pending_acceptance','accepted','preparing','ready','completed'];
+async function renderTrackTab() {
+  if (state.myOrders.length === 0) {
+    document.getElementById('view').innerHTML = '<div class="empty-state">No orders yet. Place one from the Menu tab.</div>';
+    return;
+  }
+  
+  if (!state.branchId) {
+    document.getElementById('view').innerHTML = '<div class="empty-state">Please select a restaurant to view your orders.</div>';
+    return;
+  }
+  
+  const orders = await Promise.all(state.myOrders.slice().reverse().map(id =>
+    Api.get(`/orders/${state.branchId}/${id}`).catch((err) => {
+      console.warn(`Order ${id} not found:`, err);
+      return null;
+    })));
+  
+  const validOrders = orders.filter(Boolean);
+  
+  if (validOrders.length === 0) {
+    document.getElementById('view').innerHTML = '<div class="empty-state">No orders found for this restaurant.</div>';
+    return;
+  }
+  
+  document.getElementById('view').innerHTML = `<div class="section-title">Your orders</div>` +
+    validOrders.map(renderOrderTicket).join('');
+}
+function takeAwayStatusLabel(o) {
+  if (o.mode !== 'take_away') return statusLabel(o.status);
+  if (o.status === 'ready') return 'Ready for pickup';
+  if (o.status === 'completed') return 'Picked up';
+  return statusLabel(o.status);
+}
+function renderOrderTicket(o) {
+  const STEPS = o.mode === 'take_away' ? STEPS_TAKE_AWAY : STEPS_DINE_IN;
+  const stepIdx = STEPS.indexOf(o.status);
+  const isTerminalBad = ['rejected','cancelled'].includes(o.status);
+  return `
+    <div class="ticket" style="margin-bottom:16px;max-width:520px">
+      <div class="ticket-head">
+        <span class="ticket-num">${o.orderNumber}</span>
+        <span class="badge ${o.status}">${takeAwayStatusLabel(o)}</span>
+      </div>
+      <div class="ticket-body">
+        <div class="muted">${o.mode === 'dine_in' ? 'Dine-in' : 'Take-away'} ${o.scheduledFor ? '· pickup ' + new Date(o.scheduledFor).toLocaleString() : ''}</div>
+        ${o.items.map(i => `<div class="ticket-item"><span>${i.qty}× ${i.name}</span><span>${money(i.lineTotal)}</span></div>`).join('')}
+        ${!isTerminalBad ? `<div class="progress-track">${STEPS.map((s,idx)=>`<div class="progress-step ${idx<=stepIdx?'done':''}"></div>`).join('')}</div>` : ''}
+        ${o.status === 'cancelled' && o.refund ? `<div class="muted" style="color:var(--forest)">Refunded ${money(o.refund.amount)} · ${o.refund.reason}</div>` : ''}
+      </div>
+      <div class="ticket-foot flex-between">
+        <strong>${money(o.total)}</strong>
+        <div class="flex">
+          ${o.paymentStatus === 'unpaid' ? `<span class="badge pending_acceptance">Unpaid</span>` : o.paymentStatus === 'refunded' ? `<span class="badge cancelled">Refunded</span>` : o.paymentStatus === 'partial' ? `<span class="badge preparing">Partly paid</span>` : `<span class="badge completed">Paid via ${o.paymentMethod}</span>`}
+          ${o.status === 'pending_acceptance' ? `<button class="btn btn-danger btn-sm" onclick="cancelOrder('${o.id}')">Cancel</button>` : ''}
+        </div>
+      </div>
+      ${o.mode === 'dine_in' && o.tableId && !isTerminalBad && o.status !== 'completed' ? `
+      <div class="ticket-foot flex" style="gap:8px;border-top:1px solid var(--line)">
+        <button class="btn btn-sm" onclick="callWaiter('${o.tableId}','assistance',this)">🔔 Call waiter</button>
+        <button class="btn btn-sm" onclick="callWaiter('${o.tableId}','bill',this)">🧾 Request bill</button>
+      </div>` : ''}
+    </div>`;
+}
+async function cancelOrder(id) {
+  try {
+    await Api.patch(`/orders/${state.branchId}/${id}/cancel`);
+    toast('Order cancelled — any payment taken has been refunded');
+    renderTrackTab();
+  } catch (e) { toast(e.message); }
+}
+async function callWaiter(tableId, type, btn) {
+  try {
+    await Api.post(`/tables/${state.branchId}/${tableId}/request`, { type });
+    toast(type === 'bill' ? 'Requested the bill — a waiter is on the way' : 'Waiter has been notified');
+    if (btn) { btn.disabled = true; btn.textContent = 'Notified ✓'; }
+  } catch (e) { toast(e.message); }
+}
+
+async function loadFavorites() {
+  try {
+    state.favorites = await Api.get('/favorites/user');
+  } catch (e) { state.favorites = []; }
+}
+
+function renderFavoritesTab() {
+  if (isGuest) {
+    document.getElementById('view').innerHTML = '<div class="empty-state">Sign in to save your favorites.</div>';
+    return;
+  }
+  const items = state.favorites.filter(f => f.item).map(f => f.item);
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Your Favorite Items</div>
+    ${items.length === 0 ? '<div class="empty-state">No favorites yet. Click the heart icon on menu items to add them.</div>' : `
+      <div class="item-grid">
+        ${items.map(item => {
+          const inCart = state.cart.find(c => c.menuItemId === item.id);
+          const qty = inCart ? inCart.qty : 0;
+          return `
+            <div class="item-card">
+              <div class="flex-between">
+                <span class="${item.veg ? 'veg-dot' : 'nonveg-dot'}"></span>
+                <button class="btn-ghost" style="padding:0;border:none;background:transparent;font-size:1.2rem" onclick="removeFavorite('${state.favorites.find(f=>f.item && f.item.id===item.id).id}')">♥️</button>
+              </div>
+              <h3 style="margin:0;font-size:1.05rem">${item.name}</h3>
+              <div class="muted" style="min-height:32px">${item.description}</div>
+              <div class="flex-between">
+                <strong>${money(item.price)}</strong>
+                <span class="muted">★ ${item.rating || '—'}</span>
+              </div>
+              <div class="flex-between">
+                <span class="badge accepted" style="text-transform:capitalize">${item.mode.replace('_',' ')}</span>
+                ${qty === 0 ? `<button class="btn btn-primary btn-sm" onclick="addToCart('${item.id}')">Add to cart</button>` : `<div class="qty-stepper"><button onclick="changeQty('${item.id}',-1)">−</button><span>${qty}</span><button onclick="changeQty('${item.id}',1)">+</button></div>`}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `}
+  `;
+}
+
+async function removeFavorite(id) {
+  try {
+    await Api.del(`/favorites/${id}`);
+    toast('Removed from favorites');
+    await loadFavorites();
+    renderFavoritesTab();
+  } catch (e) { toast(e.message); }
+}
+
+async function toggleFavorite(menuItemId) {
+  if (isGuest) { toast('Sign in to save favorites'); return; }
+  try {
+    const existing = state.favorites.find(f => f.menuItemId === menuItemId);
+    if (existing) {
+      await removeFavorite(existing.id);
+    } else {
+      await Api.post('/favorites', { menuItemId, restaurantId: state.restaurant.id, branchId: state.branchId, type: 'item' });
+      toast('Added to favorites');
+      await loadFavorites();
+    }
+  } catch (e) { toast(e.message); }
+}
+
+async function loadReviews() {
+  try {
+    state.myReviews = await Api.get('/reviews/user/all');
+  } catch (e) { state.myReviews = []; }
+}
+
+function renderReviewsTab() {
+  if (isGuest) {
+    document.getElementById('view').innerHTML = '<div class="empty-state">Sign in to see and write reviews.</div>';
+    return;
+  }
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Your Reviews</div>
+    ${state.myReviews.length === 0 ? '<div class="empty-state">You haven&apos;t written any reviews yet.</div>' : `
+      <div class="grid grid-2">
+        ${state.myReviews.map(r => `
+          <div class="card">
+            <div class="flex-between">
+              <strong>★ ${r.rating}/5</strong>
+              <button class="btn btn-danger btn-sm" onclick="deleteReview('${r.id}')">Delete</button>
+            </div>
+            <div class="muted" style="margin-top:8px">${r.text}</div>
+            <div style="margin-top:8px;font-size:0.78rem;color:var(--ink-soft)">${new Date(r.createdAt).toLocaleDateString()}</div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+    <div class="section-title" style="margin-top:28px">Write a Review</div>
+    <div class="card" style="max-width:520px">
+      <div class="grid grid-2">
+        <div class="field">
+          <label>Item</label>
+          <select id="reviewItemId">
+            <option value="">Select an item...</option>
+            ${state.items.map(i => `<option value="${i.id}">${i.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label>Rating</label>
+          <select id="reviewRating">
+            <option value="">Select rating...</option>
+            <option value="5">★★★★★ Excellent</option>
+            <option value="4">★★★★ Good</option>
+            <option value="3">★★★ Average</option>
+            <option value="2">★★ Poor</option>
+            <option value="1">★ Terrible</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Your Review</label>
+        <textarea id="reviewText" rows="3" placeholder="Share your experience..."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="submitReview()">Submit Review</button>
+    </div>
+  `;
+}
+
+async function submitReview() {
+  const menuItemId = document.getElementById('reviewItemId').value;
+  const rating = parseInt(document.getElementById('reviewRating').value);
+  const text = document.getElementById('reviewText').value;
+
+  if (!menuItemId || !rating || !text) {
+    toast('Please fill all fields');
+    return;
+  }
+
+  try {
+    await Api.post('/reviews', { menuItemId, restaurantId: state.restaurant.id, rating, text });
+    toast('Review submitted!');
+    await loadReviews();
+    renderReviewsTab();
+  } catch (e) { toast(e.message); }
+}
+
+async function deleteReview(id) {
+  if (confirm('Delete this review?')) {
+    try {
+      await Api.del(`/reviews/${id}`);
+      toast('Review deleted');
+      await loadReviews();
+      renderReviewsTab();
+    } catch (e) { toast(e.message); }
+  }
+}
+
+init();
+</script>
+</body>
+</html>

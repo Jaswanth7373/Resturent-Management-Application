@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventory Manager — The Copper Fork</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="topbarRoot"></div>
+<div class="shell">
+  <div class="tabs" id="tabNav"></div>
+  <div id="view"></div>
+</div>
+<div class="panel-overlay" id="ingOverlay" onclick="closeIngredientDetail()"></div>
+<div class="panel" id="ingPanel"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const user = Auth.requireRole(['inventory_manager']);
+document.getElementById('topbarRoot').innerHTML = renderTopbar('Inventory Manager');
+let state = { ingredients: [], suppliers: [], transactions: [], socket: null, activeTab: 'stock' };
+
+window.__getAssistantLiveData = async function() {
+  const lowStockItems = state.ingredients.filter(i => i.lowStock).map(i => ({ name: i.name, qty: i.stock }));
+  return { kind: 'inventory', lowStockItems, supplierCount: state.suppliers.length };
+};
+
+async function init() {
+  state.socket = connectSocket(user.branchId);
+  state.socket.on('inventory:updated', () => loadAll().then(render));
+  state.socket.on('inventory:low_stock', (d) => toast(`⚠ Low stock: ${d.ingredient} (${d.stock} left)`));
+  mountAttendanceWidget(user.branchId);
+  await loadAll();
+  setTab('stock');
+}
+
+async function loadAll() {
+  const [ingredients, suppliers, transactions] = await Promise.all([
+    Api.get(`/inventory/${user.branchId}`),
+    Api.get(`/inventory/${user.branchId}/suppliers`),
+    Api.get(`/inventory/${user.branchId}/transactions`)
+  ]);
+  state.ingredients = ingredients;
+  state.suppliers = suppliers;
+  state.transactions = transactions;
+}
+
+function lowStockCount() { return state.ingredients.filter(i => i.lowStock).length; }
+
+function setTab(tab) {
+  state.activeTab = tab;
+  const tabs = [
+    { id: 'stock', label: 'Current Stock' },
+    { id: 'alerts', label: `Low Stock Alerts (${lowStockCount()})` },
+    { id: 'movement', label: 'Stock In / Out' },
+    { id: 'suppliers', label: 'Suppliers' },
+    { id: 'history', label: 'Purchase History' },
+  ];
+  document.getElementById('tabNav').innerHTML = tabs.map(t =>
+    `<button class="tab ${state.activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">${t.label}</button>`
+  ).join('');
+  render();
+}
+
+function render() {
+  ({ stock: renderStock, alerts: renderAlerts, movement: renderMovement, suppliers: renderSuppliers, history: renderHistory })[state.activeTab]();
+}
+
+function renderStock() {
+  const levelBadge = { heavy: 'accepted', medium: 'pending_acceptance', low: 'rejected' };
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Current Inventory</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+        <thead style="background:var(--cream-dim)">
+          <tr>
+            <th style="padding:10px;text-align:left">Item</th>
+            <th style="padding:10px;text-align:left">Current Stock</th>
+            <th style="padding:10px;text-align:left">Unit</th>
+            <th style="padding:10px;text-align:left">Low Stock Threshold</th>
+            <th style="padding:10px;text-align:left">Status</th>
+            <th style="padding:10px;text-align:left">Kitchen read</th>
+            <th style="padding:10px">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${state.ingredients.map(i => `
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:10px"><strong>${i.name}</strong></td>
+              <td style="padding:10px">${i.stock}</td>
+              <td style="padding:10px">${i.unit}</td>
+              <td style="padding:10px">${i.lowStockThreshold}</td>
+              <td style="padding:10px">
+                <span class="badge ${i.lowStock ? 'rejected' : 'accepted'}">${i.lowStock ? 'Low' : 'OK'}</span>
+              </td>
+              <td style="padding:10px">${i.chefStockLevel ? `<span class="badge ${levelBadge[i.chefStockLevel]}">${i.chefStockLevel}</span>` : '<span class="muted">—</span>'}</td>
+              <td style="padding:10px;text-align:center">
+                <button class="btn btn-sm btn-primary" onclick="showMovement('${i.id}','in')">Stock in</button>
+                <button class="btn btn-sm btn-outline" onclick="showMovement('${i.id}','out')">Stock out</button>
+                <button class="btn btn-sm btn-outline" onclick="openIngredientDetail('${i.id}')">Details</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+async function openIngredientDetail(id) {
+  const i = state.ingredients.find(x => x.id === id);
+  if (!i) return;
+  const panel = document.getElementById('ingPanel');
+  panel.innerHTML = `<div class="flex-between"><h3 style="margin:0">${i.name}</h3><button class="btn-outline btn btn-sm" onclick="closeIngredientDetail()">✕</button></div>
+    <div class="muted">Loading history...</div>`;
+  panel.classList.add('open'); document.getElementById('ingOverlay').classList.add('open');
+
+  const [txns, purchaseOrders] = await Promise.all([
+    Api.get(`/inventory/${user.branchId}/transactions?ingredientId=${id}`),
+    Api.get(`/inventory/${user.branchId}/purchase-orders?ingredientId=${id}`)
+  ]);
+  const supName = (sid) => (state.suppliers.find(s => s.id === sid) || {}).name || '—';
+  panel.innerHTML = `
+    <div class="flex-between"><h3 style="margin:0">${i.name}</h3><button class="btn-outline btn btn-sm" onclick="closeIngredientDetail()">✕</button></div>
+    <div class="grid grid-2" style="margin-top:12px">
+      <div class="card stat-card"><div class="label">Current stock</div><div class="value" style="font-size:1.4rem">${i.stock} ${i.unit}</div></div>
+      <div class="card stat-card"><div class="label">Low-stock threshold</div><div class="value" style="font-size:1.4rem">${i.lowStockThreshold} ${i.unit}</div></div>
+    </div>
+    ${i.chefStockLevel ? `<div class="card" style="margin-top:10px">Kitchen read: <strong>${i.chefStockLevel}</strong> (set by ${i.chefStockLevelBy || 'chef'}, ${timeAgo(i.chefStockLevelAt)})</div>` : ''}
+
+    <div class="section-title">Supplier</div>
+    <div class="field"><label>Preferred supplier for this item</label>
+      <select id="ingSupplier-${id}" onchange="setPreferredSupplier('${id}', this.value)">
+        <option value="">— none set —</option>
+        ${state.suppliers.map(s => `<option value="${s.id}" ${i.preferredSupplierId===s.id?'selected':''}>${s.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="flex" style="gap:8px;align-items:flex-end">
+      <div class="field" style="flex:1"><label>Reorder qty</label><input type="number" id="ingSendQty-${id}" value="${i.suggestedReorderQty || i.lowStockThreshold * 2}"></div>
+      <button class="btn btn-primary btn-sm" onclick="sendToSupplier('${id}')">Send order to supplier</button>
+    </div>
+    <p class="muted" style="font-size:0.75rem">This logs a purchase-order record for tracking — there's no live email/SMS to the supplier in this build.</p>
+
+    ${purchaseOrders.length ? `
+    <div class="section-title">Purchase orders sent</div>
+    ${purchaseOrders.map(po => `<div class="split-row"><span>${po.qty} ${po.unit} → ${po.supplierName}</span><span class="muted">${timeAgo(po.sentAt)}</span></div>`).join('')}` : ''}
+
+    <div class="section-title">Purchase / movement history</div>
+    ${txns.length === 0 ? '<p class="muted">No movements recorded yet.</p>' : txns.map(t => `
+      <div class="split-row">
+        <span>${t.type === 'in' ? '↑ In' : '↓ Out'} ${t.qty} ${i.unit} ${t.type==='in' ? '· ' + supName(t.supplierId) : '· ' + (t.reason||'')}</span>
+        <span class="muted">${timeAgo(t.at)}</span>
+      </div>
+      ${t.batchNumber || t.expiryDate ? `<div class="muted" style="font-size:0.75rem;margin-bottom:6px">${t.batchNumber ? 'Batch ' + t.batchNumber : ''} ${t.expiryDate ? '· exp ' + t.expiryDate : ''}</div>` : ''}
+    `).join('')}
+  `;
+}
+async function setPreferredSupplier(ingredientId, supplierId) {
+  try {
+    await Api.patch(`/inventory/${user.branchId}/${ingredientId}`, { preferredSupplierId: supplierId || null });
+    toast('Preferred supplier updated');
+    await loadAll();
+  } catch (e) { toast(e.message); }
+}
+async function sendToSupplier(ingredientId) {
+  const i = state.ingredients.find(x => x.id === ingredientId);
+  const supplierId = document.getElementById(`ingSupplier-${ingredientId}`).value || i.preferredSupplierId;
+  const qty = Number(document.getElementById(`ingSendQty-${ingredientId}`).value);
+  if (!supplierId) return toast('Pick a supplier first');
+  if (!qty) return toast('Enter a quantity to order');
+  try {
+    const po = await Api.post(`/inventory/${user.branchId}/${ingredientId}/send-to-supplier`, { supplierId, qty });
+    toast(`Order sent to ${po.supplierName} for ${po.qty} ${po.unit}`);
+    await loadAll();
+    openIngredientDetail(ingredientId);
+  } catch (e) { toast(e.message); }
+}
+function closeIngredientDetail() {
+  document.getElementById('ingPanel').classList.remove('open');
+  document.getElementById('ingOverlay').classList.remove('open');
+}
+
+function renderAlerts() {
+  const lowStock = state.ingredients.filter(i => i.lowStock);
+  if (lowStock.length === 0) {
+    document.getElementById('view').innerHTML = '<div class="empty-state">All items are well-stocked!</div>';
+    return;
+  }
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Low Stock Items</div>
+    <div class="grid grid-3">
+      ${lowStock.map(i => `
+        <div class="card">
+          <div class="flex-between">
+            <strong>${i.name}</strong>
+            <span class="badge rejected">Low</span>
+          </div>
+          <div style="margin-top:12px">
+            <div class="muted">Current: <strong style="color:var(--rust)">${i.stock} ${i.unit}</strong></div>
+            <div class="muted">Threshold: ${i.lowStockThreshold} ${i.unit}</div>
+            <div class="muted">Suggested reorder: <strong>${i.suggestedReorderQty} ${i.unit}</strong></div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="showMovement('${i.id}','in',${i.suggestedReorderQty})">Restock now</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderMovement(prefillId, prefillType, prefillQty) {
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Record stock in / out</div>
+    <div class="card" style="max-width:520px">
+      <div class="field">
+        <label>Item</label>
+        <select id="movItem">
+          <option value="">Select an item...</option>
+          ${state.ingredients.map(i => `<option value="${i.id}">${i.name} (${i.stock} ${i.unit} in stock)</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Direction</label>
+        <select id="movType">
+          <option value="in">Stock in — delivery received</option>
+          <option value="out">Stock out — waste / spoilage / correction</option>
+        </select>
+      </div>
+      <div class="field"><label>Quantity</label><input type="number" id="movQty" min="1" placeholder="0"></div>
+
+      <div id="movInFields">
+        <div class="field"><label>Supplier</label>
+          <select id="movSupplier"><option value="">— none —</option>${state.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
+        </div>
+        <div class="grid grid-2">
+          <div class="field"><label>Batch number</label><input id="movBatch" placeholder="e.g. B-2026-014"></div>
+          <div class="field"><label>Expiry date</label><input type="date" id="movExpiry"></div>
+        </div>
+      </div>
+      <div id="movOutFields" style="display:none">
+        <div class="field"><label>Reason</label>
+          <select id="movReason"><option value="waste">Waste</option><option value="spoilage">Spoilage</option><option value="correction">Stock correction</option></select>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%" onclick="submitMovement()">Save</button>
+    </div>
+  `;
+  document.getElementById('movType').addEventListener('change', (e) => toggleMovementFields(e.target.value));
+  if (prefillId) document.getElementById('movItem').value = prefillId;
+  if (prefillType) { document.getElementById('movType').value = prefillType; toggleMovementFields(prefillType); }
+  if (prefillQty) document.getElementById('movQty').value = prefillQty;
+}
+function toggleMovementFields(type) {
+  document.getElementById('movInFields').style.display = type === 'in' ? 'block' : 'none';
+  document.getElementById('movOutFields').style.display = type === 'out' ? 'block' : 'none';
+}
+function showMovement(itemId, type, qty) {
+  setTab('movement');
+  setTimeout(() => renderMovement(itemId, type, qty), 0);
+}
+async function submitMovement() {
+  const ingredientId = document.getElementById('movItem').value;
+  const type = document.getElementById('movType').value;
+  const amount = Number(document.getElementById('movQty').value);
+  if (!ingredientId || !amount) return toast('Select an item and quantity');
+  try {
+    if (type === 'in') {
+      await Api.post(`/inventory/${user.branchId}/${ingredientId}/stock-in`, {
+        amount,
+        supplierId: document.getElementById('movSupplier').value || null,
+        batchNumber: document.getElementById('movBatch').value,
+        expiryDate: document.getElementById('movExpiry').value
+      });
+      toast('Stock in recorded');
+    } else {
+      await Api.post(`/inventory/${user.branchId}/${ingredientId}/stock-out`, {
+        amount,
+        reason: document.getElementById('movReason').value
+      });
+      toast('Stock out recorded');
+    }
+    await loadAll();
+    setTab('stock');
+  } catch (e) { toast(e.message); }
+}
+
+function renderSuppliers() {
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Suppliers</div>
+    <div class="grid grid-3">
+      ${state.suppliers.map(s => `
+        <div class="card">
+          <strong>${s.name}</strong>
+          <div class="muted">${s.category || ''}</div>
+          <div class="muted">${s.phone || ''}</div>
+          <div class="muted">${s.email || ''}</div>
+        </div>`).join('') || '<p class="muted">No suppliers yet.</p>'}
+    </div>
+    <div class="section-title">Add a supplier</div>
+    <div class="card" style="max-width:420px">
+      <div class="field"><label>Name</label><input id="supName" placeholder="e.g. Fresh Farms Pvt Ltd"></div>
+      <div class="field"><label>Category</label><input id="supCategory" placeholder="e.g. Produce & Dairy"></div>
+      <div class="field"><label>Phone</label><input id="supPhone" placeholder="+91..."></div>
+      <div class="field"><label>Email</label><input id="supEmail" placeholder="orders@supplier.com"></div>
+      <button class="btn btn-primary" onclick="createSupplier()">Add supplier</button>
+    </div>
+  `;
+}
+async function createSupplier() {
+  const name = document.getElementById('supName').value.trim();
+  if (!name) return toast('Supplier name is required');
+  try {
+    await Api.post(`/inventory/${user.branchId}/suppliers`, {
+      name,
+      category: document.getElementById('supCategory').value,
+      phone: document.getElementById('supPhone').value,
+      email: document.getElementById('supEmail').value
+    });
+    toast('Supplier added');
+    await loadAll(); render();
+  } catch (e) { toast(e.message); }
+}
+
+function renderHistory() {
+  const ingName = (id) => (state.ingredients.find(i => i.id === id) || {}).name || 'Unknown';
+  const supName = (id) => (state.suppliers.find(s => s.id === id) || {}).name || '—';
+  document.getElementById('view').innerHTML = `
+    <div class="section-title">Purchase / stock history</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+        <thead style="background:var(--cream-dim)">
+          <tr>
+            <th style="padding:10px;text-align:left">When</th>
+            <th style="padding:10px;text-align:left">Item</th>
+            <th style="padding:10px;text-align:left">Direction</th>
+            <th style="padding:10px;text-align:left">Qty</th>
+            <th style="padding:10px;text-align:left">Supplier / Reason</th>
+            <th style="padding:10px;text-align:left">Batch · Expiry</th>
+            <th style="padding:10px;text-align:left">By</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${state.transactions.map(t => `
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:10px">${timeAgo(t.at)}</td>
+              <td style="padding:10px">${ingName(t.ingredientId)}</td>
+              <td style="padding:10px"><span class="badge ${t.type==='in'?'accepted':'rejected'}">${t.type==='in'?'In':'Out'}</span></td>
+              <td style="padding:10px">${t.qty}</td>
+              <td style="padding:10px">${t.type==='in' ? supName(t.supplierId) : (t.reason||'')}</td>
+              <td style="padding:10px">${t.batchNumber || '—'} ${t.expiryDate ? '· exp ' + t.expiryDate : ''}</td>
+              <td style="padding:10px">${t.recordedBy || ''}</td>
+            </tr>`).join('') || `<tr><td style="padding:10px" colspan="7" class="muted">No stock movements recorded yet.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+init();
+</script>
+</body>
+</html>

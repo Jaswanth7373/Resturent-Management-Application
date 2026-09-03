@@ -1,0 +1,244 @@
+/* ============ Design tokens ============
+   Signature: order cards read like kitchen tickets — perforated top edge,
+   punched hole, monospace order numbers — tying every dashboard back to
+   the same physical object a real kitchen uses.
+*/
+:root {
+  --ink: #21261F;
+  --ink-soft: #4A5245;
+  --cream: #FBF7EE;
+  --cream-dim: #F1EBDC;
+  --brass: #B08D2B;
+  --brass-soft: #E4D6A5;
+  --forest: #2F4A3C;
+  --forest-deep: #1D2F26;
+  --rust: #B5502F;
+  --line: #E1D8C2;
+  --white: #FFFFFF;
+  --radius: 14px;
+  --shadow: 0 6px 24px rgba(33, 38, 31, 0.08);
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--cream);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, .display { font-family: var(--font-display); letter-spacing: 0.2px; }
+a { color: inherit; }
+button { font-family: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ---------- Layout shells ---------- */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; background: var(--forest-deep); color: var(--cream);
+  position: sticky; top: 0; z-index: 40;
+}
+.topbar .brand { font-family: var(--font-display); font-size: 1.25rem; display: flex; align-items: center; gap: 10px; }
+.topbar .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--brass); display: inline-block; }
+.topbar .role-pill {
+  background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 999px; font-size: 0.78rem;
+  text-transform: uppercase; letter-spacing: 0.6px;
+}
+.topbar .actions { display: flex; align-items: center; gap: 12px; }
+.btn-ghost {
+  background: transparent; border: 1px solid rgba(255,255,255,0.35); color: var(--cream);
+  padding: 7px 14px; border-radius: 8px; font-size: 0.85rem; transition: background 0.15s;
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.12); }
+
+.shell { max-width: 1280px; margin: 0 auto; padding: 24px; }
+.grid { display: grid; gap: 18px; }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 900px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+.section-title {
+  font-size: 1.05rem; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-soft);
+  margin: 28px 0 12px; display: flex; align-items: center; gap: 10px;
+}
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px; box-shadow: var(--shadow);
+}
+.stat-card { text-align: left; }
+.stat-card .value { font-family: var(--font-display); font-size: 2rem; margin: 4px 0; }
+.stat-card .label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-soft); }
+
+/* ---------- Ticket (signature order card) ---------- */
+.ticket {
+  position: relative; background: var(--white); border-radius: 10px;
+  border: 1px solid var(--line); box-shadow: var(--shadow); overflow: hidden;
+  animation: ticket-in 0.35s ease;
+}
+@keyframes ticket-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.ticket::before {
+  content: ''; position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  width: 16px; height: 16px; border-radius: 50%; background: var(--cream); border: 1px solid var(--line);
+}
+.ticket-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 16px 10px; border-bottom: 1px dashed var(--line);
+}
+.ticket-num { font-family: var(--font-mono); font-weight: 600; font-size: 0.95rem; }
+.ticket-body { padding: 12px 16px; }
+.ticket-item { display: flex; justify-content: space-between; font-size: 0.92rem; padding: 4px 0; }
+.ticket-foot { padding: 12px 16px; border-top: 1px dashed var(--line); display: flex; gap: 8px; flex-wrap: wrap; }
+
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+}
+.badge.pending_acceptance { background: #FCEBD6; color: #9A5B12; }
+.badge.accepted { background: #DCEBE0; color: var(--forest); }
+.badge.preparing { background: #FFF1C2; color: #7A5B00; }
+.badge.ready { background: #D8ECEA; color: #0E6E63; }
+.badge.served, .badge.completed { background: #E4EFE2; color: #3A6B3F; }
+.badge.rejected, .badge.cancelled { background: #F6DCD6; color: var(--rust); }
+.badge.available { background: #E4EFE2; color: #3A6B3F; }
+.badge.occupied { background: #F6DCD6; color: var(--rust); }
+.badge.cleaning { background: #EFE7D6; color: #8A6D1F; }
+.badge.reserved { background: #E0E4F2; color: #3A4C9A; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  border: none; border-radius: 9px; padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
+  transition: transform 0.1s ease, box-shadow 0.15s ease; display: inline-flex; align-items: center; gap: 6px;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--forest); color: var(--cream); }
+.btn-primary:hover { box-shadow: 0 4px 14px rgba(47,74,60,0.35); }
+.btn-brass { background: var(--brass); color: var(--forest-deep); }
+.btn-danger { background: var(--rust); color: var(--cream); }
+.btn-outline { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+.btn-sm { padding: 6px 11px; font-size: 0.78rem; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---------- Forms ---------- */
+input, select, textarea {
+  font-family: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--white); font-size: 0.9rem; width: 100%;
+}
+label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-soft); display: block; margin-bottom: 4px; }
+.field { margin-bottom: 12px; }
+
+/* ---------- Menu item card (customer) ---------- */
+.item-card {
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px;
+  transition: transform 0.15s ease;
+}
+.item-card:hover { transform: translateY(-2px); }
+.veg-dot { width: 10px; height: 10px; border: 2px solid #3A6B3F; border-radius: 2px; display: inline-block; position: relative; }
+.veg-dot::after { content:''; position:absolute; inset: 2px; background:#3A6B3F; border-radius: 1px; }
+.nonveg-dot { width: 10px; height: 10px; border: 2px solid var(--rust); border-radius: 2px; display: inline-block; position: relative; }
+.nonveg-dot::after { content:''; position:absolute; inset: 2px; background: var(--rust); border-radius: 1px; }
+
+/* ---------- Table map ---------- */
+.table-tile {
+  aspect-ratio: 1; border-radius: 12px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 4px; border: 2px solid var(--line); background: var(--white);
+  cursor: pointer; transition: transform 0.12s ease;
+}
+.table-tile:hover { transform: translateY(-2px); }
+.table-tile.available { border-color: #3A6B3F; }
+.table-tile.occupied { border-color: var(--rust); background: #FBF0EC; }
+.table-tile.cleaning { border-color: var(--brass); background: #FBF6E8; }
+.table-tile.reserved { border-color: #3A4C9A; background: #EEF0FA; }
+.table-tile .tnum { font-family: var(--font-display); font-size: 1.4rem; }
+.table-tile .tstatus { font-size: 0.68rem; text-transform: uppercase; }
+
+/* Compact variant for status-glance views (e.g. Sub-Admin Live Ops) where tiles
+   aren't the primary tap target and don't need to be this large.
+   Fixed column width (not minmax(...,1fr)) so tiles don't stretch to fill
+   leftover row space when there are only a few tables. */
+.table-map-compact {
+  display: grid; grid-template-columns: repeat(auto-fill, 64px); justify-content: start; gap: 8px;
+}
+.table-map-compact .table-tile { border-width: 1px; gap: 1px; border-radius: 8px; }
+.table-map-compact .table-tile .tnum { font-size: 0.85rem; }
+.table-map-compact .table-tile .tstatus { font-size: 0.52rem; }
+
+/* ---------- Slide-in detail panel (waiter table panel, ingredient detail, etc.) ---------- */
+.panel { position: fixed; top:0; right:0; height:100vh; width: 380px; background:var(--white);
+  box-shadow: -8px 0 30px rgba(0,0,0,0.15); transform: translateX(100%); transition: transform 0.25s ease;
+  z-index: 60; overflow-y:auto; padding: 20px; }
+.panel.open { transform: translateX(0); }
+.panel-overlay { position: fixed; inset:0; background: rgba(0,0,0,0.25); z-index:55; display:none; }
+.panel-overlay.open { display:block; }
+
+.urgent { border: 1px solid var(--brass, #b9843b) !important; box-shadow: 0 0 0 3px rgba(185,132,59,0.15); }
+
+/* ---------- Toast ---------- */
+#toast-root { position: fixed; bottom: 18px; right: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+.toast {
+  background: var(--forest-deep); color: var(--cream); padding: 12px 16px; border-radius: 10px;
+  box-shadow: var(--shadow); font-size: 0.85rem; animation: toast-in 0.25s ease; max-width: 320px;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ---------- Scoped page assistant ---------- */
+#assistant-root { position: fixed; right: 18px; bottom: 18px; z-index: 120; }
+.assistant-fab {
+  width: 56px; height: 56px; border: none; border-radius: 999px; background: var(--forest-deep);
+  color: var(--cream); box-shadow: var(--shadow); font-size: 1.24rem;
+}
+.assistant-panel {
+  position: absolute; right: 0; bottom: 74px; width: min(360px, calc(100vw - 24px));
+  background: var(--white); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow);
+  overflow: hidden; transform: translateY(12px); opacity: 0; pointer-events: none; transition: all 0.2s ease;
+}
+.assistant-panel.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.assistant-header {
+  display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: var(--forest); color: var(--cream);
+}
+.assistant-title { font-weight: 700; font-size: 0.95rem; }
+.assistant-subtitle { font-size: 0.74rem; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.6px; }
+.assistant-close { border: none; background: transparent; color: var(--cream); font-size: 1rem; }
+.assistant-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.assistant-banner {
+  background: var(--cream-dim); color: var(--ink-soft); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; font-size: 0.8rem; line-height: 1.4;
+}
+.assistant-messages {
+  display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; padding-right: 2px;
+}
+.assistant-bubble {
+  max-width: 88%; padding: 8px 10px; border-radius: 10px; font-size: 0.85rem; line-height: 1.45; white-space: pre-line;
+}
+.assistant-bubble-bot { background: var(--cream-dim); color: var(--ink); align-self: flex-start; }
+.assistant-bubble-user { background: var(--forest); color: var(--cream); align-self: flex-end; }
+.assistant-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+.assistant-chip {
+  border: 1px solid var(--line); background: var(--white); color: var(--ink); border-radius: 999px;
+  padding: 6px 10px; font-size: 0.76rem;
+}
+.assistant-input-row { display: flex; gap: 8px; }
+.assistant-input { flex: 1; min-width: 0; }
+
+/* ---------- Skeleton ---------- */
+.skel { background: linear-gradient(90deg, var(--cream-dim) 25%, var(--line) 37%, var(--cream-dim) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; border-radius: 8px; }
+@keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+
+.muted { color: var(--ink-soft); font-size: 0.85rem; }
+.flex { display: flex; align-items: center; gap: 10px; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.tab { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--white); font-size: 0.82rem; }
+.tab.active { background: var(--forest); color: var(--cream); border-color: var(--forest); }
+.empty-state { text-align: center; padding: 48px 20px; color: var(--ink-soft); }
